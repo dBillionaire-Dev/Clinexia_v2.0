@@ -8,6 +8,7 @@ import { confirmDialog, promptDialog } from "@/components/ui/app-dialogs"
 import { api } from "@/lib/billing/client"
 import { MARKETS, type Market, type PricingConfig } from "@/lib/billing/config"
 import { formatMoney } from "@/lib/billing/pricing"
+import { PlanDialog, type PlanChoice } from "./plan-dialog"
 
 type UserRow = {
   id: string; email: string; fullName: string; accountType: string; market: Market; status: "active" | "suspended"; createdAt: string | null; lastSignInAt: string | null; confirmed: boolean
@@ -76,6 +77,7 @@ export function AccountsAdmin() {
   const [audit, setAudit] = useState<AuditRow[]>([])
   const [pricing, setPricing] = useState<PricingConfig | null>(null)
   const [detail, setDetail] = useState<Detail | null>(null)
+  const [planUser, setPlanUser] = useState<UserRow | null>(null)
   const [msg, setMsg] = useState("")
 
   const loadUsers = useCallback(async (query: string) => {
@@ -113,6 +115,14 @@ export function AccountsAdmin() {
     const typed = await promptDialog({ title: "This cannot be undone", description: `Type ${o.name} to permanently delete this organisation, its members' access and its subscription.`, label: "Organisation name", mustType: o.name, confirmLabel: "Delete organisation", destructive: true })
     if (typed) void run({ action: "deleteOrg", orgId: o.id, reason, confirm: typed }, loadBilling)
   }
+  const savePlan = async (u: UserRow, c: PlanChoice) => {
+    const r = await api<{ email?: string; label: string }>("/api/admin/accounts", { action: "setUserPlan", userId: u.id, ...c })
+    if (!r.ok) throw new Error(r.error)
+    setPlanUser(null)
+    setMsg(`Plan set: ${r.data.label}. ${r.data.email === "sent" ? "They were emailed." : "No email was sent (no email provider configured)."}`)
+    await loadUsers(q)
+  }
+  const planText = (u: UserRow) => (u.plan && (u.plan.status === "active" || u.plan.status === "cancelled") ? `${u.plan.plan === "all_access" ? "All-access" : u.plan.specialties.join(", ")} (${u.plan.status})` : "Free")
   const showDetail = async (u: UserRow) => { const r = await api<Detail>(`/api/admin/accounts?userId=${u.id}`); if (r.ok) setDetail(r.data); else setMsg(r.error) }
 
   return (
@@ -125,6 +135,7 @@ export function AccountsAdmin() {
         {TABS.map((t) => <button key={t} onClick={() => setTab(t)} aria-current={tab === t} className={`rounded-full border px-4 py-1.5 text-sm ${tab === t ? "border-primary bg-primary text-primary-foreground" : "hover:bg-muted"}`}>{t}</button>)}
       </nav>
       {msg && <p role="status" className="rounded-md border p-2 text-sm">{msg}</p>}
+      {planUser && <PlanDialog email={planUser.email} current={planText(planUser)} onClose={() => setPlanUser(null)} onSave={(c) => savePlan(planUser, c)} />}
 
       {tab === "Users" && (
         <section className="space-y-3">
@@ -147,6 +158,7 @@ export function AccountsAdmin() {
                       <td className="p-2">{u.status === "suspended" ? <span className="text-destructive">Suspended</span> : "Active"}</td>
                       <td className="p-2 space-x-3 whitespace-nowrap">
                         <button className="underline" onClick={() => void showDetail(u)}>Details</button>
+                        <button className="underline" onClick={() => setPlanUser(u)}>Plan</button>
                         {u.status === "suspended" ? <button className="underline" onClick={() => void restoreUser(u)}>Restore</button> : <button className="underline" onClick={() => void suspendUser(u)}>Suspend</button>}
                         <button className="underline text-destructive" onClick={() => void deleteUser(u)}>Delete</button>
                       </td>

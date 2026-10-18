@@ -5,6 +5,7 @@ import { APP_VERSION } from "@/lib/build-info"
 import { getPlatform } from "@/lib/platform"
 import type { FeedbackAnswers } from "./questions"
 import { DEFAULT_CONFIG, normalizeState, parseConfig, type FeedbackConfig, type FeedbackState } from "./schedule"
+import { preserveCompletion } from "./preserve"
 
 const STATE_KEY = "clinexia:feedback:v1"
 const CONFIG_KEY = "clinexia:feedback:config"
@@ -21,7 +22,12 @@ export function readState(version: number): FeedbackState {
 
 export function writeState(state: FeedbackState): void {
   try {
-    localStorage.setItem(STATE_KEY, JSON.stringify(state))
+    // Never let an older copy of the state erase an answer that was already recorded.
+    let stored: unknown = null
+    try {
+      stored = JSON.parse(localStorage.getItem(STATE_KEY) ?? "null")
+    } catch {}
+    localStorage.setItem(STATE_KEY, JSON.stringify(preserveCompletion(stored, state)))
   } catch {}
 }
 
@@ -68,6 +74,17 @@ export async function submitFeedback(answers: FeedbackAnswers, version: number):
     return { ok: false, error: body.error ?? "Could not send your feedback. Please try again." }
   } catch {
     return { ok: false, error: "You seem to be offline. Your answers are saved here, so you can send them when you are back online." }
+  }
+}
+
+/** Has this device already answered this round? Stored on the server, so it still holds if this device's saved state was lost. */
+export async function checkAnsweredOnServer(version: number): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/feedback/answered?v=${version}&aid=${encodeURIComponent(getAnonymousId())}`, { cache: "no-store" })
+    if (!res.ok) return false
+    return ((await res.json()) as { answered?: boolean }).answered === true
+  } catch {
+    return false
   }
 }
 

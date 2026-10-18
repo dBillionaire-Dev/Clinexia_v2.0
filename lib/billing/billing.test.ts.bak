@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import { CATEGORY_SPECIALTY, DEFAULT_PRICING, SPECIALTIES, billingEnabled, marketFromCountry, parsePricingConfig, premiumEnforced } from "./config"
 import { canDeleteUser, cleanReason, confirmationMatches, suspendedMessage } from "./admin-rules"
 import { composeNotice, sendEmail } from "./notify"
+import { GUEST_CALC_LIMIT, isGuestLimited, noteGuestCalculation, readGuestCount, safeNextPath, writeSessionState } from "./guest"
 import { canUseCalculator, hasSpecialty, isPremiumCalculator, resolveEntitlements, type MembershipContext, type PlanRecord } from "./entitlements"
 import { addMonthsUtc, effectiveStatus, nextPeriodEnd } from "./lifecycle"
 import { hashInviteToken, invitationState, parseEmailList } from "./invitations"
@@ -577,5 +578,64 @@ describe("payment webhook", () => {
   it("rejects malformed bodies", async () => {
     const w = paymentWorld()
     expect((await processPaystackWebhook({ rawBody: "{not json", signature: sign("{not json"), secret: SECRET, ...w })).status).toBe(400)
+  })
+})
+
+describe("guest allowance (3 calculations per device)", () => {
+  const memory = () => { const m = new Map<string, string>(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v) } }
+  it("counts nothing while enforcement is off or the session state is unknown", () => {
+    const s = memory()
+    expect(noteGuestCalculation(s).counted).toBe(false)
+    writeSessionState(s, { enforced: false, signedIn: false })
+    expect(noteGuestCalculation(s).counted).toBe(false)
+    expect(readGuestCount(s)).toBe(0)
+  })
+  it("never counts a signed-in person", () => {
+    const s = memory()
+    writeSessionState(s, { enforced: true, signedIn: true })
+    for (let i = 0; i < 6; i++) noteGuestCalculation(s)
+    expect(readGuestCount(s)).toBe(0)
+  })
+  it("a guest gets exactly three, then is limited", () => {
+    const s = memory()
+    writeSessionState(s, { enforced: true, signedIn: false })
+    const a = noteGuestCalculation(s)
+    expect(a).toMatchObject({ counted: true, count: 1, remaining: 2, limited: false })
+    expect(noteGuestCalculation(s)).toMatchObject({ count: 2, remaining: 1, limited: false })
+    expect(noteGuestCalculation(s)).toMatchObject({ count: 3, remaining: 0, limited: true })
+    expect(noteGuestCalculation(s)).toMatchObject({ counted: false, count: 3, limited: true })
+    expect(GUEST_CALC_LIMIT).toBe(3)
+  })
+  it("limited only applies to guests with enforcement on", () => {
+    expect(isGuestLimited({ enforced: true, signedIn: false }, 3)).toBe(true)
+    expect(isGuestLimited({ enforced: true, signedIn: false }, 2)).toBe(false)
+    expect(isGuestLimited({ enforced: true, signedIn: true }, 3)).toBe(false)
+    expect(isGuestLimited({ enforced: false, signedIn: false }, 3)).toBe(false)
+    expect(isGuestLimited(null, 3)).toBe(false)
+  })
+  it("ignores a tampered or broken counter", () => {
+    const s = memory()
+    s.setItem("clinexia-guest-calcs", "banana")
+    expect(readGuestCount(s)).toBe(0)
+    s.setItem("clinexia-guest-calcs", "999")
+    expect(readGuestCount(s)).toBe(3)
+  })
+  it("storage that throws does not break calculating", () => {
+    const broken = { getItem: () => { throw new Error("denied") }, setItem: () => { throw new Error("denied") } }
+    expect(noteGuestCalculation(broken as any).counted).toBe(false)
+  })
+})
+
+describe("where people land after signing in", () => {
+  it("keeps same-site paths and rejects anything that could leave the site or loop", () => {
+    expect(safeNextPath("/calculators/renal/egfr")).toBe("/calculators/renal/egfr")
+    expect(safeNextPath("/")).toBe("/")
+    expect(safeNextPath("https://evil.com")).toBeNull()
+    expect(safeNextPath("//evil.com")).toBeNull()
+    expect(safeNextPath("/\\evil.com")).toBeNull()
+    expect(safeNextPath("/login")).toBeNull()
+    expect(safeNextPath("/register?x=1")).toBeNull()
+    expect(safeNextPath(undefined)).toBeNull()
+    expect(safeNextPath("")).toBeNull()
   })
 })

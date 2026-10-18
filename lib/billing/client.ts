@@ -8,7 +8,7 @@ export async function api<T = any>(path: string, body?: unknown): Promise<{ ok: 
       cache: "no-store",
     })
     const data = await res.json().catch(() => null)
-    if (!res.ok) return { ok: false, error: typeof data?.error === "string" ? data.error : "Something went wrong. Please try again.", status: res.status }
+    if (!res.ok) return { ok: false, error: (typeof data?.error === "string" ? data.error : "Something went wrong. Please try again.") + (typeof data?.hint === "string" ? ` (${data.hint})` : ""), status: res.status }
     return { ok: true, data: data as T }
   } catch {
     return { ok: false, error: "You appear to be offline. Please check your connection.", status: 0 }

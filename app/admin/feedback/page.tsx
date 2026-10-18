@@ -2,9 +2,10 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { isAdminAuthenticated } from "@/lib/admin-auth"
 import { deleteFeedback, getFeedbackConfig, listFeedback, saveFeedbackSettings } from "@/lib/feedback/server"
-import { BACKGROUND, labelOf, MED_ROLES, NON_MED_ROLES, OFFICE_TYPES, PAY_INTEREST, PAY_WHO, PRICE_INDIVIDUAL, PRICE_TEAM, USE_CONTEXT } from "@/lib/feedback/questions"
+import { BACKGROUND, DEVICES, labelOf, MED_ROLES, NON_MED_ROLES, OFFICE_TYPES, PAY_INTEREST, PAY_WHO, PRICE_INDIVIDUAL, PRICE_TEAM, USE_CONTEXT } from "@/lib/feedback/questions"
 import { summarize, type Tally } from "@/lib/feedback/summary"
 import { AdminNav, Card, Section, num, pct } from "@/components/admin/traction-ui"
+import { FeedbackBrowser } from "@/components/admin/feedback-browser"
 
 export const dynamic = "force-dynamic"
 
@@ -82,9 +83,29 @@ export default async function FeedbackAdminPage({ searchParams }: { searchParams
     error = e instanceof Error ? e.message : "Could not load feedback. Did you run supabase/feedback.sql?"
   }
   const s = summarize(rows)
-  const texts = rows.filter((r) => r.improve || r.missing || r.other).slice(0, 60)
   const field = "rounded-md border bg-background px-2 py-1.5 text-sm"
   const btn = "rounded-md border bg-background px-3 py-2 text-sm font-medium hover:bg-muted"
+  const optional = (label: string, value: string | null | undefined): [string, string][] => (value ? [[label, value]] : [])
+  const browserRows = rows.map((r) => ({
+    id: r.id,
+    createdAt: r.created_at,
+    rating: r.rating,
+    role: labelOf([...MED_ROLES, ...NON_MED_ROLES], r.role),
+    texts: { improve: r.improve, missing: r.missing, other: r.other },
+    details: [
+      ["Healthcare background", labelOf(BACKGROUND, r.background)],
+      ["Role", labelOf([...MED_ROLES, ...NON_MED_ROLES], r.role)],
+      ["Devices", r.devices.map((d) => labelOf(DEVICES, d)).join(", ") || "None"],
+      ["Used for", labelOf(USE_CONTEXT, r.use_context) + (r.office_type ? `, ${labelOf(OFFICE_TYPES, r.office_type)}` : "")],
+      ["Would pay", labelOf(PAY_INTEREST, r.pay_interest)],
+      ...optional("Price per person / month", r.price_individual ? labelOf(PRICE_INDIVIDUAL, r.price_individual) : null),
+      ...optional("Team price", r.price_team ? labelOf(PRICE_TEAM, r.price_team) : null),
+      ...optional("Who would pay", r.pay_who ? labelOf(PAY_WHO, r.pay_who) : null),
+      ["Platform", r.platform ?? "unknown"],
+      ["App version", r.app_version ?? "unknown"],
+      ["Round", String(r.survey_version)],
+    ] as [string, string][],
+  }))
 
   return (
     <main className="min-h-screen bg-muted/20">
@@ -181,32 +202,8 @@ export default async function FeedbackAdminPage({ searchParams }: { searchParams
           </div>
         </Section>
 
-        <Section title={`What people wrote (${texts.length} most recent with text)`}>
-          {texts.length ? (
-            <ul className="space-y-3">
-              {texts.map((r) => (
-                <li key={r.id} className="rounded-xl border bg-background p-4 text-sm">
-                  <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                    <span className="font-semibold text-foreground">{"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)}</span>
-                    <span>{new Date(r.created_at).toLocaleDateString()}</span>
-                    <span>{labelOf([...MED_ROLES, ...NON_MED_ROLES], r.role)}</span>
-                    <span>{labelOf(USE_CONTEXT, r.use_context)}{r.office_type ? `, ${labelOf(OFFICE_TYPES, r.office_type)}` : ""}</span>
-                    <span>Pay: {labelOf(PAY_INTEREST, r.pay_interest)}{r.price_individual ? `, ${labelOf(PRICE_INDIVIDUAL, r.price_individual)}/mo` : ""}{r.price_team ? `, team ${labelOf(PRICE_TEAM, r.price_team)}/mo` : ""}{r.pay_who ? `, ${labelOf(PAY_WHO, r.pay_who).toLowerCase()}` : ""}</span>
-                    <span>{r.platform} · {r.app_version}</span>
-                  </div>
-                  {r.improve ? <p><span className="text-muted-foreground">Improve: </span>{r.improve}</p> : null}
-                  {r.missing ? <p><span className="text-muted-foreground">Missing: </span>{r.missing}</p> : null}
-                  {r.other ? <p><span className="text-muted-foreground">Other: </span>{r.other}</p> : null}
-                  <form action={removeResponse} className="mt-2">
-                    <input type="hidden" name="id" value={r.id} />
-                    <button className="text-xs text-muted-foreground hover:text-destructive hover:underline" title="Delete this response, for example if it contains personal details">Delete</button>
-                  </form>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="rounded-xl border bg-background p-4 text-sm text-muted-foreground">No written feedback yet.</p>
-          )}
+        <Section title={`All feedback (${rows.length})`}>
+          <FeedbackBrowser rows={browserRows} deleteAction={removeResponse} />
         </Section>
       </div>
     </main>

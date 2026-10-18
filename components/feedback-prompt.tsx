@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button"
 import { getAllHistory } from "@/lib/history/db"
 import { isLandingSite } from "@/lib/site"
 import { localDay, loadConfig, readState, writeState } from "@/lib/feedback/client"
+import { checkAnsweredOnServer } from "@/lib/feedback/client"
+import { markDone } from "@/lib/feedback/schedule"
 import {
   MIN_PAGE_AGE_MS,
   decidePrompt,
@@ -35,8 +37,10 @@ export function FeedbackPrompt() {
 
   const evaluate = useCallback(async () => {
     const c = config.current
-    const s = state.current
-    if (!c || !s) return
+    if (!c) return
+    // Judge from what is saved right now: the form (or another tab) may have recorded an answer since this popup loaded.
+    const s = readState(c.version)
+    state.current = s
     let calculations: number | null = null
     try {
       calculations = (await getAllHistory()).length
@@ -63,6 +67,13 @@ export function FeedbackPrompt() {
       config.current = loaded
       state.current = recordVisit(readState(loaded.version), localDay())
       writeState(state.current)
+      // An answer already stored on the server for this device and round counts, even if this device's saved state was lost.
+      void checkAnsweredOnServer(loaded.version).then((answered) => {
+        if (!answered) return
+        writeState(markDone(readState(loaded.version), Date.now()))
+        state.current = readState(loaded.version)
+        setVisible(false)
+      })
       void evaluate()
     })()
     return () => {
@@ -81,6 +92,17 @@ export function FeedbackPrompt() {
     return () => window.clearTimeout(timer)
   }, [pathname, evaluate])
 
+  // The form announces when it is sent, so the popup goes away at once and cannot come back for this round.
+  useEffect(() => {
+    const refresh = () => { setVisible(false); void evaluate() }
+    window.addEventListener("clinexia:feedback-done", refresh)
+    window.addEventListener("storage", refresh)
+    return () => {
+      window.removeEventListener("clinexia:feedback-done", refresh)
+      window.removeEventListener("storage", refresh)
+    }
+  }, [evaluate])
+
   const save = (next: FeedbackState) => {
     state.current = next
     writeState(next)
@@ -91,7 +113,7 @@ export function FeedbackPrompt() {
 
   const rate = (stars: number) => {
     // Starting the form pauses the popup for one hour without using up a "Later".
-    save(pauseForHours(state.current as FeedbackState, Date.now(), 1))
+    save(pauseForHours(readState((config.current as FeedbackConfig).version), Date.now(), 1))
     router.push(`/feedback?rating=${stars}`)
   }
 
@@ -120,7 +142,7 @@ export function FeedbackPrompt() {
         ))}
       </div>
       <div className="flex items-center justify-center gap-2">
-        <Button size="sm" variant="outline" onClick={() => save(snooze(state.current as FeedbackState, config.current as FeedbackConfig, Date.now()))}>
+        <Button size="sm" variant="outline" onClick={() => save(snooze(readState((config.current as FeedbackConfig).version), config.current as FeedbackConfig, Date.now()))}>
           Later
         </Button>
       </div>

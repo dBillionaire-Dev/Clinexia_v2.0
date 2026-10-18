@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   if (!v.ok) return problem(v.error, 400)
 
   try {
-    const { userId, session } = await signUpUser(v.value.email, v.value.password, v.value.fullName)
+    const { userId, session } = await signUpUser(v.value.email, v.value.password, v.value.fullName, `${new URL(request.url).origin}/login?confirmed=1`)
     if (userId) {
       // ignoreDuplicates: never overwrite an existing person's profile
       await db

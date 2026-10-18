@@ -28,17 +28,27 @@ async function call(path: string, init: { method?: string; body?: unknown; token
   return { ok: res.ok, status: res.status, json }
 }
 
-export async function signUpUser(email: string, password: string, fullName: string): Promise<{ userId: string | null; session: Session | null }> {
-  const r = await call("signup", { body: { email, password, data: { full_name: fullName } } })
+export async function signUpUser(email: string, password: string, fullName: string, redirectTo?: string): Promise<{ userId: string | null; session: Session | null }> {
+  const r = await call(redirectTo ? `signup?redirect_to=${encodeURIComponent(redirectTo)}` : "signup", { body: { email, password, data: { full_name: fullName } } })
   if (!r.ok) throw new Error(`signup ${r.status}`)
   const user = r.json?.user ?? r.json
   const session = r.json?.access_token ? r.json : r.json?.session ?? null
   return { userId: typeof user?.id === "string" ? user.id : null, session }
 }
 
-export async function signInUser(email: string, password: string): Promise<Session | null> {
+export type SignInResult = { session: Session } | { error: "unconfirmed" | "invalid" }
+
+export async function signInUser(email: string, password: string): Promise<SignInResult> {
   const r = await call("token?grant_type=password", { body: { email, password } })
-  return r.ok && r.json?.access_token ? (r.json as Session) : null
+  if (r.ok && r.json?.access_token) return { session: r.json as Session }
+  const code = String(r.json?.error_code ?? r.json?.code ?? "")
+  const msg = String(r.json?.msg ?? r.json?.message ?? r.json?.error_description ?? "").toLowerCase()
+  return { error: code === "email_not_confirmed" || msg.includes("not confirmed") ? "unconfirmed" : "invalid" }
+}
+
+/** Sends the confirmation email again. Callers must answer the same way whether or not the address exists. */
+export async function resendConfirmation(email: string, redirectTo?: string): Promise<void> {
+  await call(redirectTo ? `resend?redirect_to=${encodeURIComponent(redirectTo)}` : "resend", { body: { type: "signup", email } })
 }
 
 async function refreshSession(refreshToken: string): Promise<Session | null> {
