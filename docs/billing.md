@@ -60,3 +60,30 @@
 
 ## Dialogs
 - Use `confirmDialog` / `promptDialog` from `components/ui/app-dialogs.tsx` instead of `window.confirm` / `window.prompt`. They need no provider and follow the app theme.
+
+## Campaigns (admin > Campaigns): notices and review forms without coding
+- Run `supabase/campaigns.sql` once. Then open `/admin/campaigns` (nav: Campaigns).
+- Per campaign choose: notice or review form (questions: stars, written, pick one, pick several, yes/no), how it appears (pop-up window,
+  bar under the header, small corner alert), heading, message, optional button and link, who sees it (everyone, guests, signed in),
+  how often (once, every visit, every N days), start and end time (it starts and stops by itself), "Remind me later" and its wait,
+  auto-hide seconds (bars and alerts), whether it can be closed. Preview shows it before it goes live.
+- People who answer a form never see it again; people who tap "Remind me later" see it again after the wait. "Show again to everyone"
+  re-opens a campaign to people who already answered. One campaign appears per visit, a few seconds after the app opens.
+- Responses: open a form campaign to read every answer.
+
+## Feedback reminders
+- The in-app star prompt now re-reads what is saved before every decision and never overwrites a recorded answer. The server also
+  remembers which device answered each round (`/api/feedback/answered`), so people who answered are not asked again, even after their
+  saved state is lost. People who tap Later come back after the configured hours; "Ask everyone again" (new round) re-opens it for all.
+
+## If sign-in shows 503
+- In development the error now says what to fix. Usual causes: `SUPABASE_ANON_KEY` missing from `.env.local`, or
+  `supabase/billing.sql` / `supabase/billing-admin.sql` not run. Restart `pnpm dev` after editing `.env.local`.
+
+## "Remind me later" and the profile icon
+- Tapping "Remind me later" on a campaign shrinks the card into the profile icon, which gets a red "!" (and a small bounce when the
+  card lands). Open the profile menu: a "Complete feedback form" entry reopens the form in a pop-up. Answering removes it; "No thanks,
+  remove this reminder" in that pop-up removes it too. Notices parked this way show as "You have a message" and clear once opened.
+- Parked items disappear by themselves if the campaign ends, is paused or deleted, or is re-issued with "Show again to everyone".
+- The normal timed reminder (the hours set on the campaign) still applies. If accounts are switched off there is no profile icon, so
+  "Remind me later" simply waits the set hours. People who prefer reduced motion get no flying animation (the "!" still appears).

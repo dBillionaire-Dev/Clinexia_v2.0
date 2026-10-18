@@ -9,6 +9,7 @@ import { confirmDialog } from "@/components/ui/app-dialogs"
 import { api } from "@/lib/billing/client"
 import { ORGANISATION_TYPES, SPECIALTY_LABELS, type Specialty } from "@/lib/billing/config"
 import { AuthForm } from "./auth-form"
+import { notifySessionChanged } from "@/lib/billing/use-account-session"
 import { PlanPicker } from "./plan-picker"
 
 type Me = {
@@ -52,6 +53,7 @@ export function AccountApp() {
   const load = useCallback(async () => {
     const r = await api<Me>("/api/account/me")
     setMe(r.ok ? r.data : null)
+    notifySessionChanged()
   }, [])
   useEffect(() => { void load() }, [load])
 
@@ -63,7 +65,7 @@ export function AccountApp() {
     <div className="space-y-8">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div><h1 className="text-2xl font-semibold">Your account</h1><p className="text-sm text-muted-foreground">{me.user.email} · {me.market === "intl" ? "International pricing (USD)" : "Nigeria pricing (₦)"}</p></div>
-        <Button variant="outline" onClick={async () => { await api("/api/account/logout", {}); setMe(null) }}>Sign out</Button>
+        <Button variant="outline" onClick={async () => { await api("/api/account/logout", {}); setMe(null); notifySessionChanged() }}>Sign out</Button>
       </header>
 
       <section className="rounded-lg border p-4 space-y-2">

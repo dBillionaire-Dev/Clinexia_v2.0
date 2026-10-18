@@ -9,7 +9,7 @@ import { BACKGROUND, rolesFor } from "@/lib/feedback/questions"
 
 const field = "w-full rounded-md border bg-background px-3 py-2 text-sm"
 
-export function AuthForm({ onDone, initialMode = "signup" }: { onDone: () => void; initialMode?: "signup" | "login" }) {
+export function AuthForm({ onDone, initialMode = "signup", onNeedsConfirmation }: { onDone: () => void; initialMode?: "signup" | "login"; onNeedsConfirmation?: (email: string) => void }) {
   const [type, setType] = useState<"individual" | "enterprise" | null>(null)
   const [mode, setMode] = useState<"signup" | "login">(initialMode)
   const [f, setF] = useState({ email: "", password: "", fullName: "", background: "", role: "" })
@@ -24,7 +24,10 @@ export function AuthForm({ onDone, initialMode = "signup" }: { onDone: () => voi
     const r = mode === "login" ? await api("/api/account/login", { email: f.email, password: f.password }) : await api<{ signedIn: boolean }>("/api/account/signup", { ...f, accountType: type })
     setBusy(false)
     if (!r.ok) return setError(r.error)
-    if (mode === "signup" && !(r.data as { signedIn: boolean }).signedIn) return setNotice("Check your email to confirm your address, then sign in.")
+    if (mode === "signup" && !(r.data as { signedIn: boolean }).signedIn) {
+      if (onNeedsConfirmation) return onNeedsConfirmation(f.email.trim().toLowerCase())
+      return setNotice("Check your email to confirm your address, then sign in.")
+    }
     onDone()
   }
 

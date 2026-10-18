@@ -126,6 +126,7 @@ export function FeedbackForm() {
     setSending(false)
     if (!result.ok) return setError(result.error)
     writeState(markDone(readState(version), Date.now()))
+    window.dispatchEvent(new Event("clinexia:feedback-done"))
     try {
       localStorage.removeItem(DRAFT_KEY)
     } catch {}

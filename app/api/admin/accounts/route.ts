@@ -3,10 +3,12 @@ import { isAdminAuthenticated } from "@/lib/admin-auth"
 import { billingEnabled } from "@/lib/billing/config"
 import { cleanReason, confirmationMatches, suspendedMessage } from "@/lib/billing/admin-rules"
 import { getAuthUser } from "@/lib/billing/admin-users"
+import { cleanSpecialties } from "@/lib/billing/pricing"
+import { SPECIALTY_LABELS } from "@/lib/billing/config"
 import { isUuid } from "@/lib/billing/db"
 import { composeNotice, sendEmail, type NoticeKind } from "@/lib/billing/notify"
 import {
-  deleteOrganisationCompletely, deleteUserCompletely, getOrgOwner, loadAdminUserDetail, loadAdminUsers, recordAudit, setOrgMarket, setSuspended, setUserMarket, setUserStatus,
+  deleteOrganisationCompletely, deleteUserCompletely, getOrgOwner, loadAdminUserDetail, loadAdminUsers, recordAudit, setOrgMarket, setSuspended, setUserMarket, setUserPlan, setUserStatus,
 } from "@/lib/billing/store"
 
 export const dynamic = "force-dynamic"
@@ -88,6 +90,22 @@ export async function POST(request: Request) {
       if (!result.ok) return out({ error: result.error }, 409)
       await recordAudit({ actorKind: "platform_admin", action: "user.deleted", detail: { email: user.email, reason, notice: email } })
       return out({ ok: true, email })
+    }
+    case "setUserPlan": {
+      if (!isUuid(userId)) return out({ error: "Invalid user." }, 400)
+      const plan = body.plan === "free" || body.plan === "specialty" || body.plan === "all_access" ? body.plan : null
+      if (!plan) return out({ error: "Choose free, specialty premium or all-access." }, 400)
+      const specialties = plan === "specialty" ? cleanSpecialties(body.specialties) : []
+      if (!specialties || (plan === "specialty" && specialties.length === 0)) return out({ error: "Choose at least one specialty." }, 400)
+      const months = plan === "free" ? 0 : Number(body.months)
+      if (plan !== "free" && (!Number.isInteger(months) || months < 1 || months > 24)) return out({ error: "Choose 1 to 24 months." }, 400)
+      const user = await getAuthUser(userId)
+      if (!user) return out({ error: "User not found." }, 404)
+      const { periodEnd } = await setUserPlan(userId, plan, specialties, months)
+      const label = plan === "free" ? "Free" : `${plan === "all_access" ? "All-access premium" : `Premium (${specialties.map((x) => SPECIALTY_LABELS[x]).join(", ")})`} until ${new Date(periodEnd!).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}`
+      const email = await notify(user.email, "plan_changed", { name: label })
+      await recordAudit({ actorKind: "platform_admin", actorUserId: userId, action: "user.plan_set", detail: { plan, specialties, months, periodEnd, email } })
+      return out({ ok: true, email, label })
     }
     case "setUserMarket": {
       if (!isUuid(userId) || (body.market !== "ng" && body.market !== "intl")) return out({ error: "Invalid request." }, 400)

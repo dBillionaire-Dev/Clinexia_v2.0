@@ -6,6 +6,7 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { ChromeGate } from "@/components/landing/chrome-gate"
 import { GuestGuard } from "@/components/account/guest-guard"
+import { CampaignHost } from "@/components/campaigns/campaign-host"
 
 export function AppHeader() {
   const pathname = usePathname()
@@ -17,6 +18,7 @@ export function AppHeader() {
       <ChromeGate>
         <Header />
       </ChromeGate>
+      <CampaignHost />
       <GuestGuard />
     </>
   )

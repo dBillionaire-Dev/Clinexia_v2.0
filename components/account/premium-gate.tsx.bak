@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { Lock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -14,6 +15,7 @@ type Verdict = { allowed: boolean; premium?: boolean; signedIn?: boolean; specia
  */
 export function PremiumGate({ id, category, children }: { id?: string; category?: string; children: ReactNode }) {
   const [verdict, setVerdict] = useState<Verdict | null>(null)
+  const here = encodeURIComponent(usePathname() ?? "/")
 
   useEffect(() => {
     let cancelled = false
@@ -43,8 +45,8 @@ export function PremiumGate({ id, category, children }: { id?: string; category?
           <Button asChild><Link href="/account">See plans</Link></Button>
         ) : (
           <>
-            <Button asChild><Link href="/login">Sign in</Link></Button>
-            <Button asChild variant="outline"><Link href="/register">Create account</Link></Button>
+            <Button asChild><Link href={`/login?next=${here}`}>Sign in</Link></Button>
+            <Button asChild variant="outline"><Link href={`/register?next=${here}`}>Create account</Link></Button>
           </>
         )}
       </div>

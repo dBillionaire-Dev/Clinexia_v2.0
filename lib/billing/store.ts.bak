@@ -3,6 +3,7 @@ import { db, eq, isUuid, uuid, type Row } from "./db"
 import { DEFAULT_PRICING, SPECIALTIES, parsePricingConfig, type Currency, type Market, type PricingConfig, type Specialty } from "./config"
 import { deleteAuthUser, getAuthUser, listAuthUsers } from "./admin-users"
 import { canDeleteUser } from "./admin-rules"
+import { addMonthsUtc } from "./lifecycle"
 import type { MembershipContext, PlanRecord } from "./entitlements"
 import type { AcceptResult, CreateInviteResult, InviteRecord, MemberRecord, OrgRecord, OrgStore } from "./org-actions"
 import type { ApplyResult, PaymentStore } from "./payments"
@@ -349,4 +350,20 @@ export async function deleteOrganisationCompletely(orgId: string) {
 export async function getOrgOwner(orgId: string): Promise<{ name: string; ownerId: string } | null> {
   const [o] = await db.select("billing_organisations", `select=name,owner_user_id&id=eq.${uuid(orgId)}`)
   return o ? { name: o.name as string, ownerId: o.owner_user_id as string } : null
+}
+
+/** Administrator sets a person's plan directly (no payment): free, specialty premium, or all-access, for a number of months. */
+export async function setUserPlan(userId: string, plan: "free" | "specialty" | "all_access", specialties: Specialty[], months: number): Promise<{ periodEnd: string | null }> {
+  const id = uuid(userId)
+  if (plan === "free") {
+    const existing = await getSubscriptionFor({ userId: id })
+    if (existing) await db.update("billing_subscriptions", `id=eq.${uuid(existing.id)}`, { status: "expired", current_period_end: new Date().toISOString(), cancel_at_period_end: false, updated_at: new Date().toISOString() })
+    return { periodEnd: null }
+  }
+  const periodEnd = new Date(addMonthsUtc(Date.now(), months)).toISOString()
+  const subId = await ensureSubscription({ userId: id }, { plan, specialties: plan === "specialty" ? specialties : [], seats: 1 })
+  await db.update("billing_subscriptions", `id=eq.${uuid(subId)}`, {
+    plan, specialties: plan === "specialty" ? specialties : [], seats: 1, status: "active", current_period_end: periodEnd, cancel_at_period_end: false, updated_at: new Date().toISOString(),
+  })
+  return { periodEnd }
 }

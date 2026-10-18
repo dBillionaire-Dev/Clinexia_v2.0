@@ -34,6 +34,9 @@ export async function refreshAccountSession(): Promise<void> {
   emit()
 }
 
+/** Call after signing in or out so the navbar icon and badges update straight away. */
+export const notifySessionChanged = () => { if (typeof window !== "undefined") window.dispatchEvent(new Event("clinexia:session-changed")) }
+
 export function useAccountSession(): AccountSession {
   const value = useSyncExternalStore(
     (cb) => { listeners.add(cb); return () => { listeners.delete(cb) } },
@@ -48,6 +51,13 @@ export function useAccountSession(): AccountSession {
       if (last) { snapshot = { loading: true, enabled: true, enforced: last.enforced, signedIn: last.signedIn }; emit() }
     } catch { /* ignore */ }
     void refreshAccountSession()
+    // Stay in step with sign-in or sign-out done anywhere else (another tab, the account page, an expired cookie).
+    let last = Date.now()
+    const again = () => { if (document.visibilityState === "visible" && Date.now() - last > 3000) { last = Date.now(); void refreshAccountSession() } }
+    document.addEventListener("visibilitychange", again)
+    window.addEventListener("focus", again)
+    window.addEventListener("pageshow", again)
+    window.addEventListener("clinexia:session-changed", () => void refreshAccountSession())
   }, [])
   return value
 }

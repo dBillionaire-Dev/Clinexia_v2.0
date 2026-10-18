@@ -44,5 +44,38 @@
 - Check: `GET /api/billing/access?id=<calculator id>` returns what the page is told. Offline or unreachable = the calculator stays usable.
 - This is a front-end lock; the calculations still run in the browser. Real protection needs premium calculations moved behind a server endpoint.
 
+## Sign-up, sign-in and the navbar icon
+- Register at `/register`. If email confirmation is on (Supabase > Authentication > Providers > Email), people see "Check your email" and,
+  after 10 seconds, land on `/login`. They can resend the email. When they sign in they go to the app home page (or to the page they
+  were heading to via `?next=`), not to `/account`. `/account` opens when they use a premium tool ("See plans") or from the navbar menu.
+- Supabase > Authentication > URL Configuration: set **Site URL** to your app address and add `<your address>/login` (and
+  `http://localhost:3000/login` for testing) to **Redirect URLs**, or the confirmation link will not bring people back.
+- The navbar profile icon appears whenever accounts are on. Signed out: Sign in / Create account. Signed in: My account / Sign out.
+
+## Guests (only while BILLING_ENFORCE_PREMIUM=true)
+- A signed-out visitor gets 3 calculations per device (each browser, installed PWA or Android app keeps its own count). After that the
+  page is browse-only: links work, everything else asks them to create an account. Clearing site data resets the count (front-end limit).
+- Tool lists and tool pages show **Free** or **Premium · <specialty>** badges (All-access covers every premium specialty); signed-in
+  people see **Unlocked** on specialties they have.
+
 ## Dialogs
 - Use `confirmDialog` / `promptDialog` from `components/ui/app-dialogs.tsx` instead of `window.confirm` / `window.prompt`. They need no provider and follow the app theme.
+
+## Campaigns (admin > Campaigns): notices and review forms without coding
+- Run `supabase/campaigns.sql` once. Then open `/admin/campaigns` (nav: Campaigns).
+- Per campaign choose: notice or review form (questions: stars, written, pick one, pick several, yes/no), how it appears (pop-up window,
+  bar under the header, small corner alert), heading, message, optional button and link, who sees it (everyone, guests, signed in),
+  how often (once, every visit, every N days), start and end time (it starts and stops by itself), "Remind me later" and its wait,
+  auto-hide seconds (bars and alerts), whether it can be closed. Preview shows it before it goes live.
+- People who answer a form never see it again; people who tap "Remind me later" see it again after the wait. "Show again to everyone"
+  re-opens a campaign to people who already answered. One campaign appears per visit, a few seconds after the app opens.
+- Responses: open a form campaign to read every answer.
+
+## Feedback reminders
+- The in-app star prompt now re-reads what is saved before every decision and never overwrites a recorded answer. The server also
+  remembers which device answered each round (`/api/feedback/answered`), so people who answered are not asked again, even after their
+  saved state is lost. People who tap Later come back after the configured hours; "Ask everyone again" (new round) re-opens it for all.
+
+## If sign-in shows 503
+- In development the error now says what to fix. Usual causes: `SUPABASE_ANON_KEY` missing from `.env.local`, or
+  `supabase/billing.sql` / `supabase/billing-admin.sql` not run. Restart `pnpm dev` after editing `.env.local`.

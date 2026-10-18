@@ -6,8 +6,10 @@ import { billingEnabled } from "@/lib/billing/config"
 export const dynamic = "force-dynamic"
 export const metadata: Metadata = { title: "Create account", robots: { index: false, follow: false } }
 
-// Not linked from anywhere and not in the sitemap. Reachable by address while the account feature is on.
-export default function Page() {
+// Not linked from the home page and not in the sitemap. Reachable by address (and from the navbar account icon) while accounts are on.
+export default async function Page({ searchParams }: { searchParams: Promise<{ next?: string; registered?: string; confirmed?: string }> }) {
   if (!billingEnabled()) notFound()
-  return <div className="mx-auto w-full max-w-md px-4 py-12"><AuthPage mode="signup" /></div>
+  const q = await searchParams
+  const notice = q.confirmed ? "confirmed" : q.registered ? "registered" : null
+  return <div className="mx-auto w-full max-w-md px-4 py-12"><AuthPage mode="signup" next={q.next} notice={notice} /></div>
 }
