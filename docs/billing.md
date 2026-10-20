@@ -87,3 +87,48 @@
 - Parked items disappear by themselves if the campaign ends, is paused or deleted, or is re-issued with "Show again to everyone".
 - The normal timed reminder (the hours set on the campaign) still applies. If accounts are switched off there is no profile icon, so
   "Remind me later" simply waits the set hours. People who prefer reduced motion get no flying animation (the "!" still appears).
+
+## Mobile app (Clinexia_V3_0-Mobile) uses this backend
+- The Android app and the mobile site have no server of their own: sign-up, sign-in, plans, checkout, campaigns and feedback all go
+  through this site's APIs, so accounts, plans and responses are shared and appear in the admin screens (Users shows where each
+  account was created: Website, Android app or Mobile site).
+- The apps sign in with tokens: `POST /api/account/login` with the header `X-Clinexia-Client: android` (or `mobile-web`) returns the tokens in
+  the response instead of setting cookies; they are sent back as `Authorization: Bearer <token>`; `POST /api/account/refresh` renews them.
+- `proxy.ts` answers the browsers' preflight requests only for the origins in `lib/billing/cors.ts` (Android app `https://localhost`, the
+  mobile site `https://clinexia-mobile.vercel.app`). Add others with `MOBILE_ALLOWED_ORIGINS=https://a.example,https://b.example`.
+- Mobile checkouts open Paystack in the system browser; Paystack returns to `/account/payment?app=1`, which just says to go back to the app,
+  and the app confirms the payment itself.
+- Re-run `supabase/billing-admin.sql` (adds `billing_profiles.source`).
+
+## Where a campaign shows, and following the account
+- In Admin > Campaigns each campaign has "Where it shows": Website, Android app, Mobile website (tick any). Run `supabase/campaigns.sql` again to add the setting.
+- Forms answered while signed in are linked to the account, so answering on the website means the phone does not ask again (and the other way round).
+  "Remind me later" also follows the account: park a form on the phone and it waits in the profile icon on the website too.
+  Guests have no account to follow, so for them everything stays per device (the 3-calculation guest limit is per phone or browser by nature).
+- The app asks the server again when someone returns after about 10 minutes, so a newly published campaign appears without a restart.
+- The star-rating prompt (not the campaign forms) is still remembered per device.
+
+## Phone notifications (push) to the Android app
+1. Run `supabase/push.sql` once.
+2. Firebase console: create a project, add an Android app with the mobile app's package id (the `appId` in the mobile repo's capacitor.config), download
+   `google-services.json` into the mobile repo at `android/app/`.
+3. Firebase > Project settings > Service accounts > Generate new private key. Put the whole JSON file contents (or its base64) in the server env var
+   `FCM_SERVICE_ACCOUNT_JSON` on Vercel, then redeploy.
+4. Mobile repo: `pnpm add @capacitor/push-notifications && npx cap sync android`, then build a new APK.
+5. Admin > Campaigns > Phone notifications: write a title and message, optionally a link, choose who, press send. It arrives even when the app is closed.
+   Phones register when the person turns notifications on (Account > Notifications). Sending is immediate; scheduling a notification is not built.
+
+## Signing in from the app
+- The app must use the website's full address, `https://www.clinexia.app` (not `clinexia.app`, which redirects and cannot be used for a POST from the app).
+- Testing the mobile app from your computer against the live website: add the origin you are testing from to the website's `MOBILE_ALLOWED_ORIGINS`
+  (for example `http://localhost:3000`), redeploy, and remove it afterwards.
+
+## Linking devices to accounts (real name + history in the admin)
+- Run `supabase/billing-link.sql` once (after `analytics.sql` and `billing.sql`).
+- Every visitor is tracked by a random device ID. When a person registers or signs in on a device (website or app), that device is linked to their account, and the device's
+  automatic name ("User-XXXXXX") becomes the name they typed when registering (a name you typed by hand in the admin is never overwritten). Accounts made before this existed link
+  the next time that person opens the website or app while signed in.
+- Admin > Accounts management > Users > Details now lists the account's linked devices and its full calculation history (most used tools, time span, latest 100), including
+  everything done on those devices **before** they registered. You can also link or unlink a device by pasting its device ID.
+- A device used by more than one account stays linked to each. Only the first account renames it.
+- Privacy: this connects device activity to a named person, only after they register or sign in. Mention it in your privacy policy. The app skips linking when the person has analytics switched off.

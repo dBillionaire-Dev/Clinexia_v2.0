@@ -1,5 +1,5 @@
 // When a campaign is shown to one person on one device. Pure; the browser keeps the small per-campaign state.
-import { audienceMatches, isLive, type Campaign } from "./model"
+import { audienceMatches, isLive, platformMatches, type Campaign, type Platform } from "./model"
 
 export const HOUR_MS = 3_600_000
 export const DAY_MS = 86_400_000
@@ -16,10 +16,11 @@ export function normalizeState(raw: unknown, version: number): LocalState {
   return { version, seenAt: num(s.seenAt), lastShownAt: num(s.lastShownAt), doneAt: num(s.doneAt), nextAt: num(s.nextAt) ?? 0 }
 }
 
-export interface ShowContext { now: number; signedIn: boolean; shownThisSession: boolean }
+export interface ShowContext { now: number; signedIn: boolean; shownThisSession: boolean; platform: Platform }
 
 export function shouldShow(c: Campaign, st: LocalState, ctx: ShowContext): { show: boolean; reason: string } {
   if (!isLive(c, ctx.now)) return { show: false, reason: "not live" }
+  if (!platformMatches(c, ctx.platform)) return { show: false, reason: "not for this app" }
   if (!audienceMatches(c, ctx.signedIn)) return { show: false, reason: "different audience" }
   if (st.doneAt) return { show: false, reason: "already answered" }
   if (ctx.shownThisSession) return { show: false, reason: "already shown this visit" }

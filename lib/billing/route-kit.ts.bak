@@ -1,6 +1,7 @@
 // Shared helpers for the billing API routes: the on/off gate, same-origin check, JSON helpers and error mapping.
 import { NextResponse } from "next/server"
 import { billingEnabled, marketFromCountry, type Market } from "./config"
+import { isTrustedOrigin } from "./cors"
 import { currentUser, type AccountUser } from "./session"
 import type { Failure } from "./org-actions"
 
@@ -15,7 +16,10 @@ export function guard(request: Request, opts: { write?: boolean } = {}): NextRes
   if (!billingEnabled()) return new NextResponse(null, { status: 404 })
   if (opts.write) {
     const origin = request.headers.get("origin")
-    if (origin && origin !== new URL(request.url).origin) return problem("Cross-origin request rejected.", 403)
+    // Other pages of the web app are never allowed. Our own mobile apps are: they sign in with a token (no cookies), so a
+    // cross-site page cannot ride on anyone's session through them.
+    const bearer = /^Bearer\s+\S+/i.test(request.headers.get("authorization") ?? "")
+    if (origin && origin !== new URL(request.url).origin && !bearer && !isTrustedOrigin(origin)) return problem("Cross-origin request rejected.", 403)
   }
   return null
 }
@@ -35,3 +39,10 @@ export const isResponse = (v: unknown): v is NextResponse => v instanceof NextRe
 
 /** Which price list a visitor sees when nothing is stored yet: Nigeria by IP country, everyone else international. */
 export const detectMarket = (request: Request): Market => marketFromCountry(request.headers.get("x-vercel-ip-country"))
+
+export type ClientSource = "web" | "android" | "mobile_web"
+/** Who is calling: the website, the Android app, or the mobile website. Mobile clients get tokens instead of cookies. */
+export function clientSource(request: Request): ClientSource {
+  const v = (request.headers.get("x-clinexia-client") ?? "").toLowerCase()
+  return v === "android" ? "android" : v === "mobile-web" ? "mobile_web" : "web"
+}

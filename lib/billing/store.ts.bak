@@ -279,7 +279,7 @@ export async function setUserStatus(userId: string, status: "active" | "suspende
 
 // ---- administrator views ----
 export interface AdminUserRow {
-  id: string; email: string; fullName: string; accountType: string; market: Market; status: "active" | "suspended"
+  id: string; email: string; fullName: string; accountType: string; source: string; market: Market; status: "active" | "suspended"
   createdAt: string | null; lastSignInAt: string | null; confirmed: boolean
   plan: { plan: string; specialties: Specialty[]; status: string; currentPeriodEnd: string | null } | null
   organisations: number
@@ -289,7 +289,7 @@ export interface AdminUserRow {
 export async function loadAdminUsers(q: string): Promise<{ users: AdminUserRow[]; truncated: boolean }> {
   const [{ users, truncated }, profiles, statuses, subs, mems] = await Promise.all([
     listAuthUsers(),
-    db.select("billing_profiles", "select=user_id,full_name,account_type,market&limit=5000"),
+    db.select("billing_profiles", "select=user_id,full_name,account_type,market,source&limit=5000"),
     db.select("billing_user_status", "select=user_id,status&limit=5000"),
     db.select("billing_subscriptions", "select=*&user_id=not.is.null&limit=5000"),
     db.select("billing_memberships", "select=user_id&limit=20000"),
@@ -300,7 +300,7 @@ export async function loadAdminUsers(q: string): Promise<{ users: AdminUserRow[]
     const st = statuses.find((x) => x.user_id === u.id)
     const sub = subs.find((x) => x.user_id === u.id)
     return {
-      id: u.id, email: u.email, fullName: p?.full_name ?? "", accountType: p?.account_type ?? "", market: p?.market === "intl" ? "intl" : "ng",
+      id: u.id, email: u.email, fullName: p?.full_name ?? "", accountType: p?.account_type ?? "", source: p?.source ?? "web", market: p?.market === "intl" ? "intl" : "ng",
       status: st?.status === "suspended" ? "suspended" : "active", createdAt: u.createdAt, lastSignInAt: u.lastSignInAt, confirmed: u.confirmed,
       plan: sub ? { plan: sub.plan, specialties: sub.specialties ?? [], status: sub.status, currentPeriodEnd: sub.current_period_end ?? null } : null,
       organisations: mems.filter((m) => m.user_id === u.id).length,

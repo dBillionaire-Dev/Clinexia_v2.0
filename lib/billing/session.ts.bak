@@ -1,13 +1,13 @@
 // Account sign-in through Supabase Auth (GoTrue) over plain fetch, so no new library is needed. The anon key is used only
 // on the server; the browser only ever holds two httpOnly cookies. Needs SUPABASE_URL and SUPABASE_ANON_KEY (new).
-import { cookies } from "next/headers"
+import { cookies, headers } from "next/headers"
 import { getUserStatus } from "./store"
 
 const ACCESS = "clinexia-access"
 const REFRESH = "clinexia-refresh"
 
 export interface AccountUser { id: string; email: string }
-interface Session { access_token: string; refresh_token: string; expires_in?: number }
+export interface Session { access_token: string; refresh_token: string; expires_in?: number }
 
 function cfg() {
   const url = process.env.SUPABASE_URL
@@ -51,7 +51,7 @@ export async function resendConfirmation(email: string, redirectTo?: string): Pr
   await call(redirectTo ? `resend?redirect_to=${encodeURIComponent(redirectTo)}` : "resend", { body: { type: "signup", email } })
 }
 
-async function refreshSession(refreshToken: string): Promise<Session | null> {
+export async function refreshSession(refreshToken: string): Promise<Session | null> {
   const r = await call("token?grant_type=refresh_token", { body: { refresh_token: refreshToken } })
   return r.ok && r.json?.access_token ? (r.json as Session) : null
 }
@@ -87,6 +87,12 @@ async function allowed(user: AccountUser | null): Promise<AccountUser | null> {
 
 /** The signed-in user, verified with Supabase on every call (the token is never trusted on its own). Call from route handlers. */
 export async function currentUser(): Promise<AccountUser | null> {
+  // The mobile apps send "Authorization: Bearer <token>". When that header is present it is the only thing consulted.
+  const auth = (await headers()).get("authorization")
+  if (auth) {
+    const m = /^Bearer\s+(\S+)$/i.exec(auth.trim())
+    return m ? allowed(await userFromAccessToken(m[1])) : null
+  }
   const store = await cookies()
   const access = store.get(ACCESS)?.value
   if (access) {
@@ -101,4 +107,9 @@ export async function currentUser(): Promise<AccountUser | null> {
   if (!user) return null
   await setSessionCookies(session).catch(() => undefined)
   return user
+}
+
+/** Ends the sign-in session behind a token (best effort; the app also forgets its copy). */
+export async function revokeToken(accessToken: string): Promise<void> {
+  await call("logout", { token: accessToken, body: {} }).catch(() => undefined)
 }

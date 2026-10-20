@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest"
 import { CATEGORY_SPECIALTY, DEFAULT_PRICING, SPECIALTIES, billingEnabled, marketFromCountry, parsePricingConfig, premiumEnforced } from "./config"
 import { canDeleteUser, cleanReason, confirmationMatches, suspendedMessage } from "./admin-rules"
 import { composeNotice, sendEmail } from "./notify"
+import { corsHeadersFor, corsPath, isTrustedOrigin } from "./cors"
+import { accountNameFor, isDeviceId, summariseHistory } from "./history"
 import { GUEST_CALC_LIMIT, isGuestLimited, noteGuestCalculation, readGuestCount, safeNextPath, writeSessionState } from "./guest"
 import { canUseCalculator, hasSpecialty, isPremiumCalculator, resolveEntitlements, type MembershipContext, type PlanRecord } from "./entitlements"
 import { addMonthsUtc, effectiveStatus, nextPeriodEnd } from "./lifecycle"
@@ -637,5 +639,71 @@ describe("where people land after signing in", () => {
     expect(safeNextPath("/register?x=1")).toBeNull()
     expect(safeNextPath(undefined)).toBeNull()
     expect(safeNextPath("")).toBeNull()
+  })
+})
+
+describe("which apps may call the account APIs from outside the website", () => {
+  const prod = { NODE_ENV: "production" }
+  it("trusts the Android app, the mobile site and any origin you add, and nothing else", () => {
+    expect(isTrustedOrigin("https://localhost", prod)).toBe(true)
+    expect(isTrustedOrigin("https://clinexia-mobile.vercel.app", prod)).toBe(true)
+    expect(isTrustedOrigin("https://evil.example", prod)).toBe(false)
+    expect(isTrustedOrigin("https://localhost.evil.example", prod)).toBe(false)
+    expect(isTrustedOrigin(null, prod)).toBe(false)
+    expect(isTrustedOrigin("https://app.partner.com", { ...prod, MOBILE_ALLOWED_ORIGINS: "https://app.partner.com/, https://x.y" })).toBe(true)
+  })
+  it("allows local development origins only outside production", () => {
+    expect(isTrustedOrigin("http://localhost:3001", { NODE_ENV: "development" })).toBe(true)
+    expect(isTrustedOrigin("http://10.0.2.2:3000", { NODE_ENV: "development" })).toBe(true)
+    expect(isTrustedOrigin("http://localhost:3001", prod)).toBe(false)
+  })
+  it("answers with exact-origin headers, never a wildcard and never credentials", () => {
+    const h = corsHeadersFor("https://localhost", prod)!
+    expect(h["Access-Control-Allow-Origin"]).toBe("https://localhost")
+    expect(h["Access-Control-Allow-Headers"]).toContain("Authorization")
+    expect("Access-Control-Allow-Credentials" in h).toBe(false)
+    expect(corsHeadersFor("https://evil.example", prod)).toBeNull()
+  })
+  it("covers the account, billing, campaign and feedback APIs but not admin or the payment webhook", () => {
+    expect(corsPath("/api/account/login")).toBe(true)
+    expect(corsPath("/api/billing/checkout")).toBe(true)
+    expect(corsPath("/api/campaigns/active")).toBe(true)
+    expect(corsPath("/api/feedback/config")).toBe(true)
+    expect(corsPath("/api/analytics/presence")).toBe(true)
+    expect(corsPath("/api/push/register")).toBe(true)
+    expect(corsPath("/api/admin/push")).toBe(false)
+    expect(corsPath("/api/admin/accounts")).toBe(false)
+    expect(corsPath("/api/billing/webhook")).toBe(false)
+    expect(corsPath("/account")).toBe(false)
+  })
+})
+
+describe("linking devices to accounts (admin sees the real name and the whole history)", () => {
+  it("shows the name typed at registration, otherwise the start of the email", () => {
+    expect(accountNameFor("  Ada   Okafor ", "ada@x.com")).toBe("Ada Okafor")
+    expect(accountNameFor("", "ada.okafor@x.com")).toBe("ada.okafor")
+    expect(accountNameFor(null, "@x.com")).toBe("User")
+    expect(accountNameFor("n".repeat(200), "a@x.com").length).toBe(80)
+  })
+  it("only accepts a real device id (a UUID), never anything that could be a query", () => {
+    expect(isDeviceId("3f2b8c1e-5a6d-4e7f-9a10-b2c3d4e5f607")).toBe(true)
+    expect(isDeviceId("3F2B8C1E-5A6D-4E7F-9A10-B2C3D4E5F607")).toBe(true)
+    expect(isDeviceId("abc")).toBe(false)
+    expect(isDeviceId('x" or 1=1')).toBe(false)
+    expect(isDeviceId(undefined)).toBe(false)
+  })
+  const ev = (id: string, name: string, at: string) => ({ calculator_id: id, calculator_name: name, category: "renal", occurred_at: at })
+  it("summarises the history: totals, most used, and the time span", () => {
+    const events = [ev("egfr", "eGFR", "2026-10-03T10:00:00Z"), ev("egfr", "eGFR", "2026-10-02T10:00:00Z"), ev("bmi", "BMI", "2026-10-01T10:00:00Z")]
+    const s = summariseHistory(events)
+    expect(s.total).toBe(3)
+    expect(s.top[0]).toEqual({ name: "eGFR", count: 2 })
+    expect(s.firstAt).toBe("2026-10-01T10:00:00Z")
+    expect(s.lastAt).toBe("2026-10-03T10:00:00Z")
+    expect(s.capped).toBe(false)
+  })
+  it("handles an empty history and tells when the list was cut off", () => {
+    expect(summariseHistory([])).toMatchObject({ total: 0, top: [], firstAt: null, lastAt: null })
+    expect(summariseHistory(Array.from({ length: 5 }, () => ev("a", "A", "2026-10-01T00:00:00Z")), 5).capped).toBe(true)
   })
 })

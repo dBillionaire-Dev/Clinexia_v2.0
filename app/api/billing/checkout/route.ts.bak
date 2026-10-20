@@ -1,6 +1,6 @@
 import { computeQuote, type ManagedStatus } from "@/lib/billing/pricing"
 import { can } from "@/lib/billing/roles"
-import { detectMarket, guard, isResponse, json, problem, readJson, requireUser } from "@/lib/billing/route-kit"
+import { clientSource, detectMarket, guard, isResponse, json, problem, readJson, requireUser } from "@/lib/billing/route-kit"
 import type { Market } from "@/lib/billing/config"
 import { createPaystack, makeReference } from "@/lib/billing/paystack"
 import { createOrder, ensureSubscription, getPricing, getUserMarket, orgStore, recordAudit, seatCounts } from "@/lib/billing/store"
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
   await createOrder({ reference, currency: q.currency, subscriptionId, userId: orgId ? undefined : user.id, orgId, payerUserId: user.id, amountMinor: q.totalMinor, target, quote: q as unknown as Record<string, unknown> })
 
   try {
-    const { authorizationUrl } = await createPaystack(secret).initialize({ email: user.email, amountMinor: q.totalMinor, currency: q.currency, reference, callbackUrl: `${new URL(request.url).origin}/account/payment` })
+    const { authorizationUrl } = await createPaystack(secret).initialize({ email: user.email, amountMinor: q.totalMinor, currency: q.currency, reference, callbackUrl: `${new URL(request.url).origin}/account/payment${clientSource(request) === "web" ? "" : "?app=1"}` })
     await recordAudit({ orgId, actorUserId: user.id, action: "checkout.started", detail: { reference, totalMinor: q.totalMinor, plan: q.plan } })
     return json({ authorizationUrl, reference, quote: q })
   } catch {

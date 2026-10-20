@@ -6,6 +6,9 @@
 alter table public.billing_profiles add column if not exists market text not null default 'ng' check (market in ('ng','intl'));
 alter table public.billing_organisations add column if not exists market text not null default 'ng' check (market in ('ng','intl'));
 
+-- Where the account was created: the website, the Android app, or the mobile website (shown in admin).
+alter table public.billing_profiles add column if not exists source text not null default 'web' check (source in ('web','android','mobile_web'));
+
 -- Suspension. A suspended person cannot sign in to Clinexia; the notice is what they are shown.
 create table if not exists public.billing_user_status (
   user_id uuid primary key references auth.users(id) on delete cascade,

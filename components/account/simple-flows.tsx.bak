@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button"
 import { api } from "@/lib/billing/client"
 
 /** Where Paystack sends people back to. It asks the server to confirm the payment; the redirect itself proves nothing. */
-export function PaymentReturn({ reference }: { reference: string }) {
+export function PaymentReturn({ reference, app }: { reference: string; app?: boolean }) {
   const [state, setState] = useState<"checking" | "paid" | "pending" | "failed" | "error">("checking")
   const [message, setMessage] = useState("")
   useEffect(() => {
+    if (app) return // the Clinexia app confirms the payment itself when you go back to it
     let tries = 0
     let stop = false
     async function check() {
@@ -22,8 +23,15 @@ export function PaymentReturn({ reference }: { reference: string }) {
     }
     void check()
     return () => { stop = true }
-  }, [reference])
+  }, [reference, app])
 
+  if (app)
+    return (
+      <div className="space-y-3 text-center">
+        <h1 className="text-2xl font-semibold">Payment received</h1>
+        <p className="text-sm text-muted-foreground">You can close this page and go back to the Clinexia app. Your plan switches on automatically within a moment.</p>
+      </div>
+    )
   return (
     <div className="space-y-4 text-center">
       {state === "checking" && <><Loader2 className="mx-auto h-6 w-6 animate-spin" aria-label="Checking" /><p>Confirming your payment…</p></>}

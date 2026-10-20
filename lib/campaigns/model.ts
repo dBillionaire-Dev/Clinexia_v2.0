@@ -8,6 +8,9 @@ export type Presentation = "modal" | "banner" | "toast"
 export type Audience = "everyone" | "guests" | "signed_in"
 export type Frequency = "once" | "every_visit" | "every_days"
 export type Status = "draft" | "active" | "paused"
+/** Where a campaign appears: the website, the Android app, or the mobile website. */
+export const PLATFORMS = ["web", "android", "mobile_web"] as const
+export type Platform = (typeof PLATFORMS)[number]
 
 export interface CampaignFields {
   title: string // admin-only label
@@ -19,6 +22,7 @@ export interface CampaignFields {
   ctaUrl: string
   questions: Question[]
   audience: Audience
+  platforms: Platform[]
   frequency: Frequency
   repeatDays: number
   allowLater: boolean
@@ -105,11 +109,18 @@ export function cleanCampaignInput(raw: unknown): Cleaned<CampaignFields> {
   if (startsAt === "bad" || endsAt === "bad") return { ok: false, error: "A date or time is not valid." }
   if (startsAt && endsAt && Date.parse(endsAt) <= Date.parse(startsAt)) return { ok: false, error: "The end must be after the start." }
 
+  let platforms: Platform[] = [...PLATFORMS]
+  if (r.platforms !== undefined) {
+    const list = Array.isArray(r.platforms) ? [...new Set(r.platforms.filter((p): p is Platform => (PLATFORMS as readonly string[]).includes(p as string)))] : []
+    if (list.length === 0) return { ok: false, error: "Choose where it shows: the website, the Android app, or the mobile website." }
+    platforms = list
+  }
+
   const duration = r.durationSeconds === null || r.durationSeconds === undefined || r.durationSeconds === "" ? null : int(r.durationSeconds, 3, 600, 8)
   return {
     ok: true,
     value: {
-      title, kind, presentation, heading, body: clean(r.body, LIMITS.body), ctaLabel, ctaUrl, questions, audience, frequency,
+      title, kind, presentation, heading, body: clean(r.body, LIMITS.body), ctaLabel, ctaUrl, questions, audience, platforms, frequency,
       repeatDays: int(r.repeatDays, 1, 365, 7), allowLater: r.allowLater !== false, laterHours: int(r.laterHours, 1, 720, 8),
       durationSeconds: presentation === "modal" ? null : duration, dismissible: r.dismissible !== false, startsAt, endsAt, status,
     },
@@ -123,6 +134,8 @@ export function isLive(c: Pick<CampaignFields, "status" | "startsAt" | "endsAt">
   if (c.endsAt && Date.parse(c.endsAt) <= now) return false
   return true
 }
+
+export const platformMatches = (c: { platforms?: Platform[] }, platform: Platform) => !c.platforms || c.platforms.includes(platform)
 
 export const audienceMatches = (c: Pick<CampaignFields, "audience">, signedIn: boolean) => c.audience === "everyone" || (c.audience === "signed_in" ? signedIn : !signedIn)
 

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import { CATEGORY_SPECIALTY, DEFAULT_PRICING, SPECIALTIES, billingEnabled, marketFromCountry, parsePricingConfig, premiumEnforced } from "./config"
 import { canDeleteUser, cleanReason, confirmationMatches, suspendedMessage } from "./admin-rules"
 import { composeNotice, sendEmail } from "./notify"
+import { corsHeadersFor, corsPath, isTrustedOrigin } from "./cors"
 import { GUEST_CALC_LIMIT, isGuestLimited, noteGuestCalculation, readGuestCount, safeNextPath, writeSessionState } from "./guest"
 import { canUseCalculator, hasSpecialty, isPremiumCalculator, resolveEntitlements, type MembershipContext, type PlanRecord } from "./entitlements"
 import { addMonthsUtc, effectiveStatus, nextPeriodEnd } from "./lifecycle"
@@ -637,5 +638,41 @@ describe("where people land after signing in", () => {
     expect(safeNextPath("/register?x=1")).toBeNull()
     expect(safeNextPath(undefined)).toBeNull()
     expect(safeNextPath("")).toBeNull()
+  })
+})
+
+describe("which apps may call the account APIs from outside the website", () => {
+  const prod = { NODE_ENV: "production" }
+  it("trusts the Android app, the mobile site and any origin you add, and nothing else", () => {
+    expect(isTrustedOrigin("https://localhost", prod)).toBe(true)
+    expect(isTrustedOrigin("https://clinexia-mobile.vercel.app", prod)).toBe(true)
+    expect(isTrustedOrigin("https://evil.example", prod)).toBe(false)
+    expect(isTrustedOrigin("https://localhost.evil.example", prod)).toBe(false)
+    expect(isTrustedOrigin(null, prod)).toBe(false)
+    expect(isTrustedOrigin("https://app.partner.com", { ...prod, MOBILE_ALLOWED_ORIGINS: "https://app.partner.com/, https://x.y" })).toBe(true)
+  })
+  it("allows local development origins only outside production", () => {
+    expect(isTrustedOrigin("http://localhost:3001", { NODE_ENV: "development" })).toBe(true)
+    expect(isTrustedOrigin("http://10.0.2.2:3000", { NODE_ENV: "development" })).toBe(true)
+    expect(isTrustedOrigin("http://localhost:3001", prod)).toBe(false)
+  })
+  it("answers with exact-origin headers, never a wildcard and never credentials", () => {
+    const h = corsHeadersFor("https://localhost", prod)!
+    expect(h["Access-Control-Allow-Origin"]).toBe("https://localhost")
+    expect(h["Access-Control-Allow-Headers"]).toContain("Authorization")
+    expect("Access-Control-Allow-Credentials" in h).toBe(false)
+    expect(corsHeadersFor("https://evil.example", prod)).toBeNull()
+  })
+  it("covers the account, billing, campaign and feedback APIs but not admin or the payment webhook", () => {
+    expect(corsPath("/api/account/login")).toBe(true)
+    expect(corsPath("/api/billing/checkout")).toBe(true)
+    expect(corsPath("/api/campaigns/active")).toBe(true)
+    expect(corsPath("/api/feedback/config")).toBe(true)
+    expect(corsPath("/api/analytics/presence")).toBe(true)
+    expect(corsPath("/api/push/register")).toBe(true)
+    expect(corsPath("/api/admin/push")).toBe(false)
+    expect(corsPath("/api/admin/accounts")).toBe(false)
+    expect(corsPath("/api/billing/webhook")).toBe(false)
+    expect(corsPath("/account")).toBe(false)
   })
 })

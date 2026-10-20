@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
+import { corsHeadersFor, corsPath } from "@/lib/billing/cors"
 import { APP_HOST, APP_URL, LANDING_HOST, LANDING_URL, LEGACY_HOSTS, LEGACY_REDIRECT_ON, splitEnabled } from "@/lib/site"
 
 /**
@@ -32,7 +33,7 @@ const LANDING_PASS = [
   "/favicon.ico", "/icon-192x192.png", "/icon-512x512.png", "/icon-maskable-192x192.png", "/apple-touch-icon.png", "/og-image.png",
 ]
 
-export function proxy(request: NextRequest) {
+function route(request: NextRequest) {
   if (!splitEnabled) return NextResponse.next()
 
   const host = (request.headers.get("host") ?? "").split(":")[0].toLowerCase()
@@ -76,6 +77,18 @@ export function proxy(request: NextRequest) {
   }
 
   return NextResponse.next()
+}
+
+/**
+ * Lets the Clinexia mobile apps (Android app, mobile site) call the account, billing, campaign and feedback APIs.
+ * Only origins listed in lib/billing/cors.ts (or MOBILE_ALLOWED_ORIGINS) get CORS headers; everything else is unchanged.
+ */
+export function proxy(request: NextRequest) {
+  const cors = corsPath(request.nextUrl.pathname) ? corsHeadersFor(request.headers.get("origin")) : null
+  if (cors && request.method === "OPTIONS") return new NextResponse(null, { status: 204, headers: cors })
+  const response = route(request)
+  if (cors) for (const [key, value] of Object.entries(cors)) response.headers.set(key, value)
+  return response
 }
 
 export const config = {

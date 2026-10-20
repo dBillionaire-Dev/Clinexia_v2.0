@@ -4,6 +4,8 @@ import { useState } from "react"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PasswordInput } from "./password-input"
+import { getAnonymousId } from "@/lib/analytics/client-id"
 import { api } from "@/lib/billing/client"
 import { BACKGROUND, rolesFor } from "@/lib/feedback/questions"
 
@@ -21,7 +23,7 @@ export function AuthForm({ onDone, initialMode = "signup", onNeedsConfirmation }
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true); setError(""); setNotice("")
-    const r = mode === "login" ? await api("/api/account/login", { email: f.email, password: f.password }) : await api<{ signedIn: boolean }>("/api/account/signup", { ...f, accountType: type })
+    const r = mode === "login" ? await api("/api/account/login", { email: f.email, password: f.password, anonymousId: getAnonymousId() }) : await api<{ signedIn: boolean }>("/api/account/signup", { ...f, accountType: type, anonymousId: getAnonymousId() })
     setBusy(false)
     if (!r.ok) return setError(r.error)
     if (mode === "signup" && !(r.data as { signedIn: boolean }).signedIn) {
@@ -53,7 +55,7 @@ export function AuthForm({ onDone, initialMode = "signup", onNeedsConfirmation }
       <h1 className="text-2xl font-semibold">{mode === "login" ? "Sign in" : type === "enterprise" ? "Create the organisation administrator account" : "Create your account"}</h1>
       {mode === "signup" && <label className="block text-sm"><span className="mb-1 block font-medium">Full name</span><Input value={f.fullName} onChange={(e) => set("fullName", e.target.value)} autoComplete="name" required /></label>}
       <label className="block text-sm"><span className="mb-1 block font-medium">Email</span><Input type="email" value={f.email} onChange={(e) => set("email", e.target.value)} autoComplete="email" required /></label>
-      <label className="block text-sm"><span className="mb-1 block font-medium">Password</span><Input type="password" value={f.password} onChange={(e) => set("password", e.target.value)} autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "login" ? undefined : 10} required />
+      <label className="block text-sm"><span className="mb-1 block font-medium">Password</span><PasswordInput value={f.password} onChange={(e) => set("password", e.target.value)} autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "login" ? undefined : 10} required />
         {mode === "signup" && <span className="mt-1 block text-xs text-muted-foreground">At least 10 characters.</span>}</label>
       {mode === "signup" && type === "individual" && (
         <>
