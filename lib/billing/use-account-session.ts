@@ -4,6 +4,7 @@
 // guest allowance. It remembers the last answer in local storage so a brief offline spell does not change behaviour.
 import { useEffect, useSyncExternalStore } from "react"
 import type { Specialty } from "./config"
+import { getAnonymousId } from "../analytics/client-id"
 import { readSessionState, writeSessionState } from "./guest"
 
 export interface AccountSession {
@@ -21,6 +22,17 @@ let started = false
 const listeners = new Set<() => void>()
 const emit = () => listeners.forEach((l) => l())
 
+const LINKED_KEY = "clinexia:device-linked:v1"
+/** Once per device and account: attach this device to the signed-in account (covers accounts made before linking existed). */
+async function linkThisDevice(email: string) {
+  try {
+    const key = email.toLowerCase()
+    if (localStorage.getItem(LINKED_KEY) === key) return
+    const res = await fetch("/api/account/link-device", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ anonymousId: getAnonymousId() }) })
+    if (res.ok) localStorage.setItem(LINKED_KEY, key)
+  } catch { /* try again next time */ }
+}
+
 export async function refreshAccountSession(): Promise<void> {
   try {
     const res = await fetch("/api/account/session", { cache: "no-store" })
@@ -28,6 +40,7 @@ export async function refreshAccountSession(): Promise<void> {
     const j = await res.json()
     snapshot = { loading: false, enabled: j.enabled === true, enforced: j.enforced === true, signedIn: j.signedIn === true, email: typeof j.email === "string" ? j.email : undefined, entitlements: j.entitlements }
     try { writeSessionState(window.localStorage, { enforced: snapshot.enforced, signedIn: snapshot.signedIn }) } catch { /* ignore */ }
+    if (snapshot.signedIn && snapshot.email) void linkThisDevice(snapshot.email)
   } catch {
     snapshot = { ...snapshot, loading: false } // unreachable (offline): keep the last known answer
   }

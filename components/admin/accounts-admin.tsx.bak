@@ -11,7 +11,7 @@ import { formatMoney } from "@/lib/billing/pricing"
 import { PlanDialog, type PlanChoice } from "./plan-dialog"
 
 type UserRow = {
-  id: string; email: string; fullName: string; accountType: string; market: Market; status: "active" | "suspended"; createdAt: string | null; lastSignInAt: string | null; confirmed: boolean
+  id: string; email: string; fullName: string; accountType: string; source: string; market: Market; status: "active" | "suspended"; createdAt: string | null; lastSignInAt: string | null; confirmed: boolean
   plan: { plan: string; specialties: string[]; status: string; currentPeriodEnd: string | null } | null; organisations: number
 }
 type OrgRow = { id: string; name: string; orgType: string; market: Market; seats: number; managedStatus: string; suspended: boolean; subscription: { plan: string; status: string; currentPeriodEnd: string | null } | null }
@@ -151,7 +151,7 @@ export function AccountsAdmin() {
                   {users.map((u) => (
                     <tr key={u.id} className="border-t align-top">
                       <td className="p-2">{u.fullName || "—"}<span className="block text-xs text-muted-foreground">{u.email}{u.confirmed ? "" : " (unconfirmed)"}</span></td>
-                      <td className="p-2">{u.accountType || "—"}{u.organisations ? ` · ${u.organisations} org` : ""}</td>
+                      <td className="p-2">{u.accountType || "—"}{u.organisations ? ` · ${u.organisations} org` : ""}<span className="block text-xs text-muted-foreground">{u.source === "android" ? "Android app" : u.source === "mobile_web" ? "Mobile site" : "Website"}</span></td>
                       <td className="p-2"><select className="rounded border bg-background px-1 py-0.5" value={u.market} onChange={(e) => void run({ action: "setUserMarket", userId: u.id, market: e.target.value }, () => loadUsers(q))}><option value="ng">Nigeria (₦)</option><option value="intl">International ($)</option></select></td>
                       <td className="p-2">{u.plan ? `${u.plan.plan === "all_access" ? "All-access" : u.plan.specialties.join(", ")} · ${u.plan.status}` : "Free"}</td>
                       <td className="p-2 text-xs">{d(u.createdAt)} / {d(u.lastSignInAt)}</td>

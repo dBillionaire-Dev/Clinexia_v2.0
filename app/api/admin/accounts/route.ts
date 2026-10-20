@@ -3,6 +3,8 @@ import { isAdminAuthenticated } from "@/lib/admin-auth"
 import { billingEnabled } from "@/lib/billing/config"
 import { cleanReason, confirmationMatches, suspendedMessage } from "@/lib/billing/admin-rules"
 import { getAuthUser } from "@/lib/billing/admin-users"
+import { linkDevice, unlinkDevice } from "@/lib/billing/devices"
+import { isDeviceId } from "@/lib/billing/history"
 import { cleanSpecialties } from "@/lib/billing/pricing"
 import { SPECIALTY_LABELS } from "@/lib/billing/config"
 import { isUuid } from "@/lib/billing/db"
@@ -106,6 +108,17 @@ export async function POST(request: Request) {
       const email = await notify(user.email, "plan_changed", { name: label })
       await recordAudit({ actorKind: "platform_admin", actorUserId: userId, action: "user.plan_set", detail: { plan, specialties, months, periodEnd, email } })
       return out({ ok: true, email, label })
+    }
+    case "linkDevice":
+    case "unlinkDevice": {
+      if (!isUuid(userId) || !isDeviceId(body.anonymousId)) return out({ error: "Paste a valid device ID (it looks like 8-4-4-4-12 letters and digits)." }, 400)
+      const user = await getAuthUser(userId)
+      if (!user) return out({ error: "User not found." }, 404)
+      const link = action === "linkDevice"
+      const ok = link ? await linkDevice(userId, user.email, body.anonymousId) : await unlinkDevice(userId, body.anonymousId)
+      if (!ok) return out({ error: link ? "Could not link that device. Has supabase/billing-link.sql been run?" : "That device was not linked to this account." }, link ? 500 : 404)
+      await recordAudit({ actorKind: "platform_admin", actorUserId: userId, action: link ? "device.linked" : "device.unlinked", detail: { anonymousId: body.anonymousId } })
+      return out({ ok: true })
     }
     case "setUserMarket": {
       if (!isUuid(userId) || (body.market !== "ng" && body.market !== "intl")) return out({ error: "Invalid request." }, 400)

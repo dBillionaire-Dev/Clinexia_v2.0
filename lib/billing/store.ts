@@ -4,6 +4,8 @@ import { DEFAULT_PRICING, SPECIALTIES, parsePricingConfig, type Currency, type M
 import { deleteAuthUser, getAuthUser, listAuthUsers } from "./admin-users"
 import { canDeleteUser } from "./admin-rules"
 import { addMonthsUtc } from "./lifecycle"
+import { loadDeviceHistory } from "./devices"
+import { summariseHistory, type HistoryEvent } from "./history"
 import type { MembershipContext, PlanRecord } from "./entitlements"
 import type { AcceptResult, CreateInviteResult, InviteRecord, MemberRecord, OrgRecord, OrgStore } from "./org-actions"
 import type { ApplyResult, PaymentStore } from "./payments"
@@ -279,7 +281,7 @@ export async function setUserStatus(userId: string, status: "active" | "suspende
 
 // ---- administrator views ----
 export interface AdminUserRow {
-  id: string; email: string; fullName: string; accountType: string; market: Market; status: "active" | "suspended"
+  id: string; email: string; fullName: string; accountType: string; source: string; market: Market; status: "active" | "suspended"
   createdAt: string | null; lastSignInAt: string | null; confirmed: boolean
   plan: { plan: string; specialties: Specialty[]; status: string; currentPeriodEnd: string | null } | null
   organisations: number
@@ -289,7 +291,7 @@ export interface AdminUserRow {
 export async function loadAdminUsers(q: string): Promise<{ users: AdminUserRow[]; truncated: boolean }> {
   const [{ users, truncated }, profiles, statuses, subs, mems] = await Promise.all([
     listAuthUsers(),
-    db.select("billing_profiles", "select=user_id,full_name,account_type,market&limit=5000"),
+    db.select("billing_profiles", "select=user_id,full_name,account_type,market,source&limit=5000"),
     db.select("billing_user_status", "select=user_id,status&limit=5000"),
     db.select("billing_subscriptions", "select=*&user_id=not.is.null&limit=5000"),
     db.select("billing_memberships", "select=user_id&limit=20000"),
@@ -300,7 +302,7 @@ export async function loadAdminUsers(q: string): Promise<{ users: AdminUserRow[]
     const st = statuses.find((x) => x.user_id === u.id)
     const sub = subs.find((x) => x.user_id === u.id)
     return {
-      id: u.id, email: u.email, fullName: p?.full_name ?? "", accountType: p?.account_type ?? "", market: p?.market === "intl" ? "intl" : "ng",
+      id: u.id, email: u.email, fullName: p?.full_name ?? "", accountType: p?.account_type ?? "", source: p?.source ?? "web", market: p?.market === "intl" ? "intl" : "ng",
       status: st?.status === "suspended" ? "suspended" : "active", createdAt: u.createdAt, lastSignInAt: u.lastSignInAt, confirmed: u.confirmed,
       plan: sub ? { plan: sub.plan, specialties: sub.specialties ?? [], status: sub.status, currentPeriodEnd: sub.current_period_end ?? null } : null,
       organisations: mems.filter((m) => m.user_id === u.id).length,
@@ -320,6 +322,7 @@ export async function loadAdminUserDetail(userId: string) {
     db.select("billing_audit_events", `select=*&actor_user_id=eq.${id}&order=at.desc&limit=30`),
   ])
   if (!auth) return null
+  const deviceHistory = await loadDeviceHistory(id).catch(() => ({ devices: [], events: [] as HistoryEvent[] })) // analytics tables may not be set up
   const orgIds = mems.map((m) => uuid(m.org_id))
   const orgs = orgIds.length ? await db.select("billing_organisations", `select=id,name&id=in.(${orgIds.join(",")})`) : []
   return {
@@ -327,6 +330,8 @@ export async function loadAdminUserDetail(userId: string) {
     memberships: mems.map((m) => ({ orgId: m.org_id as string, role: m.role as string, joinedAt: m.joined_at as string, name: (orgs.find((o) => o.id === m.org_id)?.name ?? "") as string })),
     orders: orders.map((o) => ({ reference: o.reference as string, amountMinor: o.amount_kobo as number, currency: o.currency as string, status: o.status as string, createdAt: o.created_at as string, paidAt: (o.paid_at ?? null) as string | null })),
     audit,
+    devices: deviceHistory.devices,
+    history: { ...summariseHistory(deviceHistory.events as HistoryEvent[]), recent: (deviceHistory.events as HistoryEvent[]).slice(0, 100) },
   }
 }
 

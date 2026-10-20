@@ -11,11 +11,13 @@ import { formatMoney } from "@/lib/billing/pricing"
 import { PlanDialog, type PlanChoice } from "./plan-dialog"
 
 type UserRow = {
-  id: string; email: string; fullName: string; accountType: string; market: Market; status: "active" | "suspended"; createdAt: string | null; lastSignInAt: string | null; confirmed: boolean
+  id: string; email: string; fullName: string; accountType: string; source: string; market: Market; status: "active" | "suspended"; createdAt: string | null; lastSignInAt: string | null; confirmed: boolean
   plan: { plan: string; specialties: string[]; status: string; currentPeriodEnd: string | null } | null; organisations: number
 }
 type OrgRow = { id: string; name: string; orgType: string; market: Market; seats: number; managedStatus: string; suspended: boolean; subscription: { plan: string; status: string; currentPeriodEnd: string | null } | null }
-type Detail = { user: { email: string }; status: { status: string; reason: string | null }; memberships: Array<{ orgId: string; role: string; name: string }>; orders: Array<{ reference: string; amountMinor: number; currency: string; status: string; createdAt: string }>; audit: Array<{ id: number; at: string; action: string }> }
+type DeviceRow = { anonymousId: string; displayName: string; firstSeenAt: string | null; lastSeenAt: string | null; lastCalculationAt: string | null; source: string; appVersion: string; linkedAt: string | null }
+type HistoryRow = { calculator_id: string; calculator_name: string; category: string; occurred_at: string; source?: string; anonymous_id?: string }
+type Detail = { devices: DeviceRow[]; history: { total: number; capped: boolean; top: Array<{ name: string; count: number }>; firstAt: string | null; lastAt: string | null; recent: HistoryRow[] }; user: { email: string }; status: { status: string; reason: string | null }; memberships: Array<{ orgId: string; role: string; name: string }>; orders: Array<{ reference: string; amountMinor: number; currency: string; status: string; createdAt: string }>; audit: Array<{ id: number; at: string; action: string }> }
 type AuditRow = { id: number; at: string; action: string; org_id: string | null; actor_kind: string; detail: Record<string, unknown> }
 
 const d = (v: string | null) => (v ? new Date(v).toLocaleDateString() : "—")
@@ -78,6 +80,9 @@ export function AccountsAdmin() {
   const [pricing, setPricing] = useState<PricingConfig | null>(null)
   const [detail, setDetail] = useState<Detail | null>(null)
   const [planUser, setPlanUser] = useState<UserRow | null>(null)
+  const [detailId, setDetailId] = useState("")
+  const [historyShown, setHistoryShown] = useState(20)
+  const [deviceInput, setDeviceInput] = useState("")
   const [msg, setMsg] = useState("")
 
   const loadUsers = useCallback(async (query: string) => {
@@ -123,7 +128,14 @@ export function AccountsAdmin() {
     await loadUsers(q)
   }
   const planText = (u: UserRow) => (u.plan && (u.plan.status === "active" || u.plan.status === "cancelled") ? `${u.plan.plan === "all_access" ? "All-access" : u.plan.specialties.join(", ")} (${u.plan.status})` : "Free")
-  const showDetail = async (u: UserRow) => { const r = await api<Detail>(`/api/admin/accounts?userId=${u.id}`); if (r.ok) setDetail(r.data); else setMsg(r.error) }
+  const showDetail = async (u: UserRow) => { const r = await api<Detail>(`/api/admin/accounts?userId=${u.id}`); if (r.ok) { setDetail(r.data); setDetailId(u.id); setHistoryShown(20); setDeviceInput("") } else setMsg(r.error) }
+  const changeDevice = async (action: "linkDevice" | "unlinkDevice", anonymousId: string) => {
+    const r = await api("/api/admin/accounts", { action, userId: detailId, anonymousId: anonymousId.trim() })
+    if (!r.ok) return setMsg(r.error)
+    setDeviceInput("")
+    const again = await api<Detail>(`/api/admin/accounts?userId=${detailId}`)
+    if (again.ok) setDetail(again.data)
+  }
 
   return (
     <div className="space-y-6">
@@ -151,7 +163,7 @@ export function AccountsAdmin() {
                   {users.map((u) => (
                     <tr key={u.id} className="border-t align-top">
                       <td className="p-2">{u.fullName || "—"}<span className="block text-xs text-muted-foreground">{u.email}{u.confirmed ? "" : " (unconfirmed)"}</span></td>
-                      <td className="p-2">{u.accountType || "—"}{u.organisations ? ` · ${u.organisations} org` : ""}</td>
+                      <td className="p-2">{u.accountType || "—"}{u.organisations ? ` · ${u.organisations} org` : ""}<span className="block text-xs text-muted-foreground">{u.source === "android" ? "Android app" : u.source === "mobile_web" ? "Mobile site" : "Website"}</span></td>
                       <td className="p-2"><select className="rounded border bg-background px-1 py-0.5" value={u.market} onChange={(e) => void run({ action: "setUserMarket", userId: u.id, market: e.target.value }, () => loadUsers(q))}><option value="ng">Nigeria (₦)</option><option value="intl">International ($)</option></select></td>
                       <td className="p-2">{u.plan ? `${u.plan.plan === "all_access" ? "All-access" : u.plan.specialties.join(", ")} · ${u.plan.status}` : "Free"}</td>
                       <td className="p-2 text-xs">{d(u.createdAt)} / {d(u.lastSignInAt)}</td>
@@ -175,6 +187,31 @@ export function AccountsAdmin() {
               <div className="flex justify-between"><p className="font-medium">{detail.user.email}</p><button className="underline" onClick={() => setDetail(null)}>Close</button></div>
               <p>Status: {detail.status.status}{detail.status.reason ? ` (${detail.status.reason})` : ""}</p>
               <p>Organisations: {detail.memberships.length ? detail.memberships.map((m) => `${m.name} (${m.role})`).join(", ") : "none"}</p>
+              <p className="font-medium">Devices linked to this account ({detail.devices.length})</p>
+              {detail.devices.length === 0 ? <p className="text-xs text-muted-foreground">None yet. A device links when this person registers or signs in on it. Devices used before they registered are included from then on.</p> : (
+                <ul className="space-y-1 text-xs">
+                  {detail.devices.map((d) => (
+                    <li key={d.anonymousId} className="flex flex-wrap items-center justify-between gap-2 rounded border p-2">
+                      <span><span className="font-medium">{d.displayName}</span> · {d.source}{d.appVersion ? ` · v${d.appVersion}` : ""} · first seen {d.firstSeenAt ? new Date(d.firstSeenAt).toLocaleDateString() : "?"}, last seen {d.lastSeenAt ? new Date(d.lastSeenAt).toLocaleDateString() : "?"}<span className="block break-all text-muted-foreground">{d.anonymousId}</span></span>
+                      <button className="underline text-destructive" onClick={() => void changeDevice("unlinkDevice", d.anonymousId)}>Unlink</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <input className="w-full max-w-sm rounded-md border bg-background px-2 py-1.5 text-xs" placeholder="Link another device: paste its device ID" value={deviceInput} onChange={(e) => setDeviceInput(e.target.value)} />
+                <Button size="sm" variant="outline" disabled={!deviceInput.trim()} onClick={() => void changeDevice("linkDevice", deviceInput)}>Link device</Button>
+              </div>
+              <p className="font-medium">Calculation history ({detail.history.total}{detail.history.capped ? "+" : ""})</p>
+              {detail.history.total === 0 ? <p className="text-xs text-muted-foreground">No calculations recorded on the linked devices.</p> : (
+                <>
+                  <p className="text-xs text-muted-foreground">Most used: {detail.history.top.map((t) => `${t.name} (${t.count})`).join(", ")}. {detail.history.firstAt ? `From ${new Date(detail.history.firstAt).toLocaleDateString()} to ${new Date(detail.history.lastAt ?? detail.history.firstAt).toLocaleDateString()}.` : ""}</p>
+                  <ul className="max-h-64 divide-y overflow-y-auto rounded border text-xs">
+                    {detail.history.recent.slice(0, historyShown).map((h, i) => <li key={`${h.occurred_at}-${i}`} className="flex justify-between gap-3 p-1.5"><span>{h.calculator_name} <span className="text-muted-foreground">· {h.category}</span></span><span className="shrink-0 text-muted-foreground">{new Date(h.occurred_at).toLocaleString()}</span></li>)}
+                  </ul>
+                  {historyShown < detail.history.recent.length && <button className="text-xs underline" onClick={() => setHistoryShown((n) => n + 20)}>Show more</button>}
+                </>
+              )}
               <p className="font-medium">Payments</p>
               <ul className="text-xs">{detail.orders.length ? detail.orders.map((o) => <li key={o.reference}>{d(o.createdAt)} · {formatMoney(o.amountMinor, o.currency === "USD" ? "USD" : "NGN")} · {o.status}</li>) : <li>None</li>}</ul>
               <p className="font-medium">Recent activity</p>

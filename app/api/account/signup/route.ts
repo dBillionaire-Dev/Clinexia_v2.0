@@ -1,6 +1,7 @@
 import { allowSubmission } from "@/lib/feedback/rate-limit"
 import { db } from "@/lib/billing/db"
-import { clientKey, detectMarket, guard, json, problem, readJson } from "@/lib/billing/route-kit"
+import { linkDevice } from "@/lib/billing/devices"
+import { clientKey, clientSource, detectMarket, guard, json, problem, readJson } from "@/lib/billing/route-kit"
 import { setSessionCookies, signUpUser } from "@/lib/billing/session"
 import { validateSignup } from "@/lib/billing/validation"
 
@@ -25,11 +26,16 @@ export async function POST(request: Request) {
     if (userId) {
       // ignoreDuplicates: never overwrite an existing person's profile
       await db
-        .insert("billing_profiles", { user_id: userId, full_name: v.value.fullName, account_type: v.value.accountType, background: v.value.background ?? null, role: v.value.role ?? null, market: detectMarket(request) }, { ignoreDuplicates: true })
+        .insert("billing_profiles", { user_id: userId, full_name: v.value.fullName, account_type: v.value.accountType, background: v.value.background ?? null, role: v.value.role ?? null, market: detectMarket(request), source: clientSource(request) }, { ignoreDuplicates: true })
         .catch(() => undefined)
+      // From this moment the device's earlier calculations belong to this person in the admin. (A made-up id for an address that already
+      // exists simply fails the link: nothing is attached to someone else's account.)
+      await linkDevice(userId, v.value.email, (body as { anonymousId?: unknown })?.anonymousId, v.value.fullName)
     }
-    if (session) await setSessionCookies(session)
-    return json({ ok: true, signedIn: Boolean(session) }) // same answer whether or not the address already existed
+    const mobile = clientSource(request) !== "web"
+    if (session && !mobile) await setSessionCookies(session)
+    // Same answer whether or not the address already existed.
+    return json({ ok: true, signedIn: Boolean(session), ...(session && mobile ? { session: { access_token: session.access_token, refresh_token: session.refresh_token, expires_in: session.expires_in ?? 3600 } } : {}) })
   } catch {
     return problem("Could not create the account. If you already have one, please sign in.", 400)
   }

@@ -79,3 +79,46 @@
 ## If sign-in shows 503
 - In development the error now says what to fix. Usual causes: `SUPABASE_ANON_KEY` missing from `.env.local`, or
   `supabase/billing.sql` / `supabase/billing-admin.sql` not run. Restart `pnpm dev` after editing `.env.local`.
+
+## "Remind me later" and the profile icon
+- Tapping "Remind me later" on a campaign shrinks the card into the profile icon, which gets a red "!" (and a small bounce when the
+  card lands). Open the profile menu: a "Complete feedback form" entry reopens the form in a pop-up. Answering removes it; "No thanks,
+  remove this reminder" in that pop-up removes it too. Notices parked this way show as "You have a message" and clear once opened.
+- Parked items disappear by themselves if the campaign ends, is paused or deleted, or is re-issued with "Show again to everyone".
+- The normal timed reminder (the hours set on the campaign) still applies. If accounts are switched off there is no profile icon, so
+  "Remind me later" simply waits the set hours. People who prefer reduced motion get no flying animation (the "!" still appears).
+
+## Mobile app (Clinexia_V3_0-Mobile) uses this backend
+- The Android app and the mobile site have no server of their own: sign-up, sign-in, plans, checkout, campaigns and feedback all go
+  through this site's APIs, so accounts, plans and responses are shared and appear in the admin screens (Users shows where each
+  account was created: Website, Android app or Mobile site).
+- The apps sign in with tokens: `POST /api/account/login` with the header `X-Clinexia-Client: android` (or `mobile-web`) returns the tokens in
+  the response instead of setting cookies; they are sent back as `Authorization: Bearer <token>`; `POST /api/account/refresh` renews them.
+- `proxy.ts` answers the browsers' preflight requests only for the origins in `lib/billing/cors.ts` (Android app `https://localhost`, the
+  mobile site `https://clinexia-mobile.vercel.app`). Add others with `MOBILE_ALLOWED_ORIGINS=https://a.example,https://b.example`.
+- Mobile checkouts open Paystack in the system browser; Paystack returns to `/account/payment?app=1`, which just says to go back to the app,
+  and the app confirms the payment itself.
+- Re-run `supabase/billing-admin.sql` (adds `billing_profiles.source`).
+
+## Where a campaign shows, and following the account
+- In Admin > Campaigns each campaign has "Where it shows": Website, Android app, Mobile website (tick any). Run `supabase/campaigns.sql` again to add the setting.
+- Forms answered while signed in are linked to the account, so answering on the website means the phone does not ask again (and the other way round).
+  "Remind me later" also follows the account: park a form on the phone and it waits in the profile icon on the website too.
+  Guests have no account to follow, so for them everything stays per device (the 3-calculation guest limit is per phone or browser by nature).
+- The app asks the server again when someone returns after about 10 minutes, so a newly published campaign appears without a restart.
+- The star-rating prompt (not the campaign forms) is still remembered per device.
+
+## Phone notifications (push) to the Android app
+1. Run `supabase/push.sql` once.
+2. Firebase console: create a project, add an Android app with the mobile app's package id (the `appId` in the mobile repo's capacitor.config), download
+   `google-services.json` into the mobile repo at `android/app/`.
+3. Firebase > Project settings > Service accounts > Generate new private key. Put the whole JSON file contents (or its base64) in the server env var
+   `FCM_SERVICE_ACCOUNT_JSON` on Vercel, then redeploy.
+4. Mobile repo: `pnpm add @capacitor/push-notifications && npx cap sync android`, then build a new APK.
+5. Admin > Campaigns > Phone notifications: write a title and message, optionally a link, choose who, press send. It arrives even when the app is closed.
+   Phones register when the person turns notifications on (Account > Notifications). Sending is immediate; scheduling a notification is not built.
+
+## Signing in from the app
+- The app must use the website's full address, `https://www.clinexia.app` (not `clinexia.app`, which redirects and cannot be used for a POST from the app).
+- Testing the mobile app from your computer against the live website: add the origin you are testing from to the website's `MOBILE_ALLOWED_ORIGINS`
+  (for example `http://localhost:3000`), redeploy, and remove it afterwards.

@@ -39,3 +39,20 @@ create index if not exists app_campaign_responses_campaign_idx on public.app_cam
 
 alter table public.app_campaigns enable row level security;
 alter table public.app_campaign_responses enable row level security;
+
+-- Where a campaign appears: website, Android app, mobile website (default: all three).
+alter table public.app_campaigns add column if not exists platforms text[] not null default array['web','android','mobile_web']::text[];
+
+-- Answers follow the signed-in person, so a form answered on the website is not asked again on the phone (and the other way round).
+alter table public.app_campaign_responses add column if not exists user_id uuid references auth.users(id) on delete set null;
+create index if not exists app_campaign_responses_user_idx on public.app_campaign_responses (user_id, campaign_id);
+
+-- "Remind me later" follows the signed-in person across devices.
+create table if not exists public.app_campaign_parked (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  campaign_id uuid not null references public.app_campaigns(id) on delete cascade,
+  campaign_version integer not null,
+  created_at timestamptz not null default now(),
+  primary key (user_id, campaign_id)
+);
+alter table public.app_campaign_parked enable row level security;

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { allowSubmission } from "@/lib/feedback/rate-limit"
-import { clientKey, guard, json, problem, readJson } from "@/lib/billing/route-kit"
+import { clientKey, clientSource, guard, json, problem, readJson } from "@/lib/billing/route-kit"
 import { setSessionCookies, signInUser, userFromAccessToken } from "@/lib/billing/session"
 import { getUserStatus } from "@/lib/billing/store"
 import { suspendedMessage } from "@/lib/billing/admin-rules"
@@ -50,6 +50,9 @@ export async function POST(request: Request) {
   }
   if (!user || !status) return unavailable(new Error("Supabase did not return the signed-in user"))
   if (status.status === "suspended") return problem(suspendedMessage(status.notice), 403) // no session is created
+  // The website keeps the session in secure cookies. The mobile apps cannot use cookies across sites, so they receive the tokens
+  // once and send them as "Authorization: Bearer" afterwards.
+  if (clientSource(request) !== "web") return json({ ok: true, session: { access_token: session.access_token, refresh_token: session.refresh_token, expires_in: session.expires_in ?? 3600 } })
   await setSessionCookies(session)
   return json({ ok: true })
 }

@@ -7,14 +7,15 @@ import { Button } from "@/components/ui/button"
 import { confirmDialog } from "@/components/ui/app-dialogs"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { api } from "@/lib/billing/client"
-import type { Campaign, CampaignFields, Question, QuestionType } from "@/lib/campaigns/model"
+import { PLATFORMS, type Campaign, type CampaignFields, type Platform, type Question, type QuestionType } from "@/lib/campaigns/model"
 import { CampaignView } from "@/components/campaigns/campaign-view"
+import { PushAdmin } from "./push-admin"
 
 type Listed = Campaign & { responses: number }
 type Response = { id: string; version: number; platform: string | null; createdAt: string; answers: Record<string, unknown> }
 
 const BLANK: CampaignFields = {
-  title: "", kind: "notice", presentation: "modal", heading: "", body: "", ctaLabel: "", ctaUrl: "", questions: [], audience: "everyone", frequency: "once", repeatDays: 7,
+  title: "", kind: "notice", presentation: "modal", heading: "", body: "", ctaLabel: "", ctaUrl: "", questions: [], audience: "everyone", platforms: [...PLATFORMS], frequency: "once", repeatDays: 7,
   allowLater: true, laterHours: 8, durationSeconds: null, dismissible: true, startsAt: null, endsAt: null, status: "draft",
 }
 const REVIEW: CampaignFields = {
@@ -24,6 +25,7 @@ const REVIEW: CampaignFields = {
     { id: "q2", type: "text", label: "What should we improve?", required: false },
   ],
 }
+const PLATFORM_LABEL: Record<Platform, string> = { web: "Website", android: "Android app", mobile_web: "Mobile website" }
 const TYPE_LABEL: Record<QuestionType, string> = { rating: "Star rating (1–5)", text: "Written answer", choice: "Pick one", multi: "Pick several", yesno: "Yes / No" }
 const field = "w-full rounded-md border bg-background px-3 py-2 text-sm"
 const toLocal = (iso: string | null) => { if (!iso) return ""; const d = new Date(iso); const p = (n: number) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}` }
@@ -103,6 +105,9 @@ function Editor({ initial, id, version, onSaved, onBack }: { initial: CampaignFi
         <h3 className="font-medium">Who, when and how often</h3>
         <div className="grid gap-3 sm:grid-cols-2">
           <Row label="Who sees it"><select className={field} value={c.audience} onChange={(e) => set("audience", e.target.value as CampaignFields["audience"])}><option value="everyone">Everyone</option><option value="guests">People not signed in</option><option value="signed_in">Signed-in people</option></select></Row>
+          <div className="sm:col-span-2 text-sm"><span className="mb-1 block font-medium">Where it shows</span>
+            <div className="flex flex-wrap gap-x-5 gap-y-1">{PLATFORMS.map((p) => <label key={p} className="flex items-center gap-2"><input type="checkbox" checked={c.platforms.includes(p)} onChange={(e) => set("platforms", e.target.checked ? [...c.platforms, p] : c.platforms.filter((x) => x !== p))} />{PLATFORM_LABEL[p]}</label>)}</div>
+            <span className="mt-1 block text-xs text-muted-foreground">Untick the places you do not want it, for example only the Android app.</span></div>
           <Row label="How often"><select className={field} value={c.frequency} onChange={(e) => set("frequency", e.target.value as CampaignFields["frequency"])}><option value="once">Once per person</option><option value="every_visit">Every visit</option><option value="every_days">Every few days</option></select></Row>
           {c.frequency === "every_days" && <Row label="Repeat every (days)"><input type="number" min={1} max={365} className={field} value={c.repeatDays} onChange={(e) => set("repeatDays", Number(e.target.value) || 1)} /></Row>}
           <Row label="Starts" hint="Leave empty to start as soon as it is switched on. Uses your local time."><input type="datetime-local" className={field} value={toLocal(c.startsAt)} onChange={(e) => set("startsAt", fromLocal(e.target.value))} /></Row>
@@ -178,6 +183,7 @@ export function CampaignsAdmin() {
   const [error, setError] = useState("")
   const [editing, setEditing] = useState<{ fields: CampaignFields; id?: string; version?: number; responses?: number } | null>(null)
   const [note, setNote] = useState("")
+  const [tab, setTab] = useState<"campaigns" | "push">("campaigns")
 
   const load = useCallback(async () => {
     const r = await api<{ campaigns: Listed[] }>("/api/admin/campaigns")
@@ -210,6 +216,10 @@ export function CampaignsAdmin() {
         <div><h1 className="text-2xl font-semibold">Campaigns</h1><p className="text-sm text-muted-foreground">Notices and review forms shown inside the app. Choose what they say, how they appear, who sees them and when. No code needed.</p></div>
         <Link href="/admin" className="text-sm underline">← Admin home</Link>
       </header>
+      <nav className="flex gap-2" aria-label="Sections">
+        {([["campaigns", "Campaigns"], ["push", "Phone notifications"]] as const).map(([k, label]) => <button key={k} onClick={() => setTab(k)} aria-current={tab === k} className={`rounded-full border px-4 py-1.5 text-sm ${tab === k ? "border-primary bg-primary text-primary-foreground" : "hover:bg-muted"}`}>{label}</button>)}
+      </nav>
+      {tab === "push" ? <PushAdmin /> : (<>
       <div className="flex flex-wrap gap-2">
         <Button onClick={() => setEditing({ fields: REVIEW })}>New review form</Button>
         <Button variant="outline" onClick={() => setEditing({ fields: { ...BLANK, title: "Announcement", heading: "What's new in Clinexia", presentation: "banner" } })}>New announcement</Button>
@@ -223,7 +233,7 @@ export function CampaignsAdmin() {
             <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 p-3">
               <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setEditing({ fields: fieldsOf(c), id: c.id, version: c.version })}>
                 <span className="block truncate font-medium">{c.title}</span>
-                <span className="block text-xs text-muted-foreground">{c.kind === "form" ? "Review form" : "Notice"} · {c.presentation === "modal" ? "pop-up" : c.presentation === "banner" ? "banner" : "alert"} · {c.audience === "everyone" ? "everyone" : c.audience === "guests" ? "guests" : "signed in"} · {when(c)}{c.kind === "form" ? ` · ${c.responses} response${c.responses === 1 ? "" : "s"}` : ""}</span>
+                <span className="block text-xs text-muted-foreground">{c.kind === "form" ? "Review form" : "Notice"} · {c.presentation === "modal" ? "pop-up" : c.presentation === "banner" ? "banner" : "alert"} · {c.audience === "everyone" ? "everyone" : c.audience === "guests" ? "guests" : "signed in"} · {c.platforms.length === 3 ? "all apps" : c.platforms.map((p) => PLATFORM_LABEL[p]).join(" + ")} · {when(c)}{c.kind === "form" ? ` · ${c.responses} response${c.responses === 1 ? "" : "s"}` : ""}</span>
               </button>
               <span className={`rounded-full border px-2.5 py-0.5 text-xs ${c.status === "active" ? "border-green-600/50 text-green-700 dark:text-green-400" : "text-muted-foreground"}`}>{c.status === "active" ? "On" : c.status === "paused" ? "Paused" : "Draft"}</span>
               <span className="space-x-3 text-sm">
@@ -235,6 +245,7 @@ export function CampaignsAdmin() {
           ))}
         </ul>
       )}
+      </>)}
     </div>
   )
 }

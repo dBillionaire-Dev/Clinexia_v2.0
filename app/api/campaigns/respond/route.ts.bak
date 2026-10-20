@@ -3,6 +3,7 @@ import { allowSubmission } from "@/lib/feedback/rate-limit"
 import { isLive, validateResponse } from "@/lib/campaigns/model"
 import { getCampaign, saveCampaignResponse } from "@/lib/campaigns/server"
 import { isUuid } from "@/lib/billing/db"
+import { currentUser } from "@/lib/billing/session"
 
 export const dynamic = "force-dynamic"
 
@@ -30,7 +31,8 @@ export async function POST(request: Request) {
     const checked = validateResponse(campaign.questions, body.answers)
     if (!checked.ok) return NextResponse.json({ error: checked.error }, { status: 400 })
     const platform = typeof body.platform === "string" ? body.platform.slice(0, 30) : null
-    await saveCampaignResponse(campaign, aid, platform, checked.value)
+    const user = await currentUser().catch(() => null) // signed in on the website or the app: the answer is linked to the account
+    await saveCampaignResponse(campaign, aid, platform, checked.value, user?.id ?? null)
     return new NextResponse(null, { status: 204 })
   } catch (error) {
     console.error("Clinexia campaign response error:", error instanceof Error ? error.message : "unknown")
