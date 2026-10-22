@@ -28,6 +28,7 @@
 - Deleting a person removes their sign-in account, profile, memberships and subscription. You must type their email to confirm.
   Payment records are kept with their links cleared. Someone who owns an organisation cannot be deleted until it is deleted or reassigned.
 - Deleting an organisation removes its members' membership, invitations and subscription; you must type its name to confirm.
+- Invitations, payment receipts and plan-ending reminders are emailed automatically through Resend (run `supabase/email-notifications.sql` once; reminders need `CRON_SECRET`, the job runs daily from `vercel.json`). Each email is sent once. If an invitation email fails, the inviter still gets the private link on screen.
 - Notices are emailed only when `RESEND_API_KEY` and `BILLING_FROM_EMAIL` are set. Deletion notices are sent before deleting.
 - Every action is written to the audit trail.
 
