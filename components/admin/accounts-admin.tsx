@@ -141,12 +141,21 @@ export function AccountsAdmin() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Accounts</h1>
-        <Link href="/admin" className="text-sm underline">← Admin home</Link>
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <button className="underline" onClick={async () => {
+            if (!(await confirmDialog({ title: "Link devices from existing activity?", description: "Devices that registered for notifications or answered a form while signed in are attached to those accounts, and every linked device gets its account's name. Safe to repeat.", confirmLabel: "Link devices" }))) return
+            const r = await api<{ linksAdded: number; renamed: number }>("/api/admin/accounts", { action: "backfillLinks" })
+            setMsg(r.ok ? `Done. ${r.data.linksAdded} new link${r.data.linksAdded === 1 ? "" : "s"}, ${r.data.renamed} device${r.data.renamed === 1 ? "" : "s"} now show the account's name.` : r.error)
+          }}>Link devices from existing activity</button>
+          <Link href="/admin/setup" className="underline">Setup check</Link>
+          <Link href="/admin" className="underline">← Admin home</Link>
+        </div>
       </header>
       <nav className="flex gap-2" aria-label="Sections">
         {TABS.map((t) => <button key={t} onClick={() => setTab(t)} aria-current={tab === t} className={`rounded-full border px-4 py-1.5 text-sm ${tab === t ? "border-primary bg-primary text-primary-foreground" : "hover:bg-muted"}`}>{t}</button>)}
       </nav>
       {msg && <p role="status" className="rounded-md border p-2 text-sm">{msg}</p>}
+      {msg && /Run supabase|missing|Could not load/i.test(msg) && <p className="text-sm"><Link href="/admin/setup" className="underline">Open the setup check</Link> to see exactly what is missing.</p>}
       {planUser && <PlanDialog email={planUser.email} current={planText(planUser)} onClose={() => setPlanUser(null)} onSave={(c) => savePlan(planUser, c)} />}
 
       {tab === "Users" && (

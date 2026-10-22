@@ -4,6 +4,8 @@ import { DEFAULT_PRICING, SPECIALTIES, parsePricingConfig, type Currency, type M
 import { deleteAuthUser, getAuthUser, listAuthUsers } from "./admin-users"
 import { canDeleteUser } from "./admin-rules"
 import { addMonthsUtc } from "./lifecycle"
+import { loadDeviceHistory } from "./devices"
+import { summariseHistory, type HistoryEvent } from "./history"
 import type { MembershipContext, PlanRecord } from "./entitlements"
 import type { AcceptResult, CreateInviteResult, InviteRecord, MemberRecord, OrgRecord, OrgStore } from "./org-actions"
 import type { ApplyResult, PaymentStore } from "./payments"
@@ -320,6 +322,7 @@ export async function loadAdminUserDetail(userId: string) {
     db.select("billing_audit_events", `select=*&actor_user_id=eq.${id}&order=at.desc&limit=30`),
   ])
   if (!auth) return null
+  const deviceHistory = await loadDeviceHistory(id).catch(() => ({ devices: [], events: [] as HistoryEvent[] })) // analytics tables may not be set up
   const orgIds = mems.map((m) => uuid(m.org_id))
   const orgs = orgIds.length ? await db.select("billing_organisations", `select=id,name&id=in.(${orgIds.join(",")})`) : []
   return {
@@ -327,6 +330,8 @@ export async function loadAdminUserDetail(userId: string) {
     memberships: mems.map((m) => ({ orgId: m.org_id as string, role: m.role as string, joinedAt: m.joined_at as string, name: (orgs.find((o) => o.id === m.org_id)?.name ?? "") as string })),
     orders: orders.map((o) => ({ reference: o.reference as string, amountMinor: o.amount_kobo as number, currency: o.currency as string, status: o.status as string, createdAt: o.created_at as string, paidAt: (o.paid_at ?? null) as string | null })),
     audit,
+    devices: deviceHistory.devices,
+    history: { ...summariseHistory(deviceHistory.events as HistoryEvent[]), recent: (deviceHistory.events as HistoryEvent[]).slice(0, 100) },
   }
 }
 

@@ -29,6 +29,7 @@ export function AdminNav({ current }: { current: "overview" | "report" | "revenu
       {item("/admin/feedback", "Feedback", "feedback")}
       {item("/admin/campaigns", "Campaigns", "campaigns")}
       {item("/admin/accounts", "Accounts management", "accounts")}
+      {item("/admin/setup", "Setup check", "setup")}
     </nav>
   )
 }

@@ -29,6 +29,51 @@ begin
   return jsonb_build_object('linked', true, 'renamed', v_renamed > 0);
 end $$;
 
+-- Links devices that are already known to belong to an account (phones that registered for notifications while signed in, and forms
+-- answered while signed in), and gives every linked device the account's name. Safe to run any number of times.
+create or replace function public.billing_backfill_device_links()
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_links integer; v_renamed integer;
+begin
+  with pairs as (
+    select anonymous_id, user_id from push_devices where user_id is not null and anonymous_id is not null
+    union
+    select anonymous_id, user_id from app_campaign_responses where user_id is not null and anonymous_id is not null
+  ), added as (
+    insert into billing_device_links (anonymous_id, user_id)
+    select anonymous_id, user_id from pairs where anonymous_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    on conflict do nothing returning 1
+  ) select count(*) into v_links from added;
+
+  update convertlab_devices d
+     set display_name = left(coalesce(nullif(trim(p.full_name), ''), split_part(u.email, '@', 1)), 80)
+    from (select distinct on (anonymous_id) anonymous_id, user_id from billing_device_links order by anonymous_id, linked_at asc) first_link
+    join auth.users u on u.id = first_link.user_id
+    left join billing_profiles p on p.user_id = u.id
+   where d.anonymous_id = first_link.anonymous_id and d.display_name = public.convertlab_display_name(d.anonymous_id);
+  get diagnostics v_renamed = row_count;
+  return jsonb_build_object('links_added', v_links, 'renamed', v_renamed);
+end $$;
+
+-- When an account is deleted, its name must not stay on the device records.
+create or replace function public.billing_forget_user_devices(p_user uuid)
+returns integer language plpgsql security definer set search_path = public as $$
+declare v_name text; v_count integer := 0;
+begin
+  select left(coalesce(nullif(trim(p.full_name), ''), split_part(u.email, '@', 1)), 80) into v_name
+    from auth.users u left join billing_profiles p on p.user_id = u.id where u.id = p_user;
+  if v_name is not null then
+    update convertlab_devices d set display_name = public.convertlab_display_name(d.anonymous_id)
+     where d.anonymous_id in (select anonymous_id from billing_device_links where user_id = p_user) and d.display_name = v_name;
+    get diagnostics v_count = row_count;
+  end if;
+  return v_count;
+end $$;
+
 revoke all on function public.billing_link_device(text, uuid, text) from public, anon, authenticated;
+revoke all on function public.billing_backfill_device_links() from public, anon, authenticated;
+revoke all on function public.billing_forget_user_devices(uuid) from public, anon, authenticated;
 grant execute on function public.billing_link_device(text, uuid, text) to service_role;
+grant execute on function public.billing_backfill_device_links() to service_role;
+grant execute on function public.billing_forget_user_devices(uuid) to service_role;
 notify pgrst, 'reload schema';

@@ -6,6 +6,7 @@
 #   - Free / Premium badges on tool lists and tool pages
 #   - feedback reminders fixed (people who answered are not asked again), full feedback browser in admin
 #   - Campaigns (notices / review forms the admin configures) shown in the app, and admin nav links
+#   - Privacy, terms, landing page and README reflect accounts, plans, device linking, campaigns and notifications
 #   - Mobile app access: lets the Clinexia Android app and mobile site use the accounts, plans and campaigns here
 # Everything stays inactive until BILLING_ENFORCE_PREMIUM=true (the navbar icon shows whenever accounts are on).
 set -euo pipefail
@@ -281,6 +282,131 @@ export function proxy(request: NextRequest) {
 
 export const config = {''', 1),
 ], 'import { NextResponse, type NextRequest } from "next/server"', 'import { corsHeadersFor, corsPath } from "@/lib/billing/cors"', "mobile access")
+
+# 12. legal pages, landing page and README reflect accounts, plans, device linking, campaigns and notifications
+edit_only("lib/legal.ts", [('export const TERMS_LAST_UPDATED = "12 October 2026"', 'export const TERMS_LAST_UPDATED = "20 October 2026"', 1)], "terms date")
+
+TERMS_NEW = """  {
+    title: "Accounts",
+    body: [
+      "You can use many tools without an account. Some features need one. When you register you give a real email address and your name, keep your password to yourself, and keep your details up to date.",
+      "An account is for one person. Do not share a login: organisations give each member of staff their own account. You are responsible for what happens under your account.",
+    ],
+  },
+  {
+    title: "Free use and limits without an account",
+    body: [
+      "Some tools are free and some are premium, and the app labels which is which. Without an account you can run a limited number of calculations on each device; after that you can keep browsing but you need an account to keep calculating. We may change which tools are free or premium and how many calculations guests get.",
+    ],
+  },
+  {
+    title: "Plans and payments",
+    body: [
+      "Premium tools are paid. You can buy access to the specialties you choose, or All-access. Prices are shown before you pay, in naira for Nigeria and in dollars elsewhere. Prices can change; a change applies to your next payment, not to one you have already made.",
+      "Each payment covers one month and does not renew by itself, so to keep access you pay again. If you cancel, you keep access until the end of the month you paid for. Choosing a different plan starts a new month from the day you pay, and unused time on the old plan is not credited. After a plan ends there may be a short grace period.",
+      "Payments are processed by Paystack. We never see or store your card details. If you think a payment was taken in error, contact us and we will look into it.",
+    ],
+  },
+  {
+    title: "Organisations",
+    body: [
+      "An organisation account is run by its owner, who chooses the plan and the number of seats, pays for it and invites staff. Owners and administrators can invite and remove members and decide which specialties each member can use. A seat is for one named person. An invitation reserves a seat until it is accepted, withdrawn or expires. The owner is responsible for the people they invite. Any discount for centrally managed organisations applies only after we have verified it.",
+    ],
+  },
+  {
+    title: "Messages and notifications",
+    body: [
+      "We may show notices and short review forms in the app and on the website, and, if you turn them on, send notifications to your phone. You can close them, and you can switch phone notifications off in your phone's settings.",
+    ],
+  },
+  {
+    title: "Suspension and deletion",
+    body: [
+      "We may suspend or delete an account that is misused, for example by sharing a login, fraud, abuse of the service or the payment system, or attempts to get around limits. We will tell you why. While an account is suspended you cannot sign in. Deleting an account is permanent: it removes the profile, memberships and subscription, and any paid time is lost. You can ask us to delete your account at any time.",
+    ],
+  },
+"""
+edit_only("app/terms/page.tsx", [
+    ('  {\n    title: "Not medical advice, not a medical device",', TERMS_NEW + '  {\n    title: "Not medical advice, not a medical device",', 1),
+    ('Features may become paid in the future; if that happens we will say so in the app.', 'Some tools are free and some are premium, as described above.', 1),
+], "accounts, plans and suspension")
+
+edit_only("app/welcome/page.tsx", [
+    ('{ q: "Do I need an account?", a: "No. Open it and start calculating." },',
+     '{ q: "Do I need an account?", a: "Not to try it. Open it and start calculating; without an account you can run a few calculations on each device. Create a free account to keep going, and choose a premium plan for specialty tools such as laboratory, pharmacy, renal, cardiology and oncology." },\n    { q: "What is free and what is premium?", a: "Some tools are free. Specialty tools are premium: pay monthly for the specialties you use, or choose All-access. Prices are shown in naira in Nigeria and in dollars elsewhere, and each tool is labelled Free or Premium in the app. Organisations can buy seats for their staff." },', 1),
+    ('a: "History, favorites and settings stay on your device. Clinexia counts anonymous usage (which tool was used, never the values you enter) to understand how many people use it and which tools matter." },',
+     'a: "History, favorites and settings stay on your device, and the values you enter and your results are never sent to us. Without an account Clinexia counts anonymous usage (which tool was used, never the values). If you create an account we keep your name, email and plan, and link your devices\' usage to your account so we can support you." },', 1),
+    ('No account needed</li>', 'Try it without an account</li>', 1),
+    ('Open it now. No sign-up, no setup.', 'Open it now. Try it without signing up.', 1),
+], "account wording")
+
+# the "Private by design" card: replace its paragraph (it is on one long line)
+import re as _re
+_p = "app/welcome/page.tsx"
+_s = load(_p)
+_new_card = "Your calculations stay on your device: the values you enter and your results are never sent to us. You can use Clinexia without an account. If you create one, we keep your name, email and plan, and link your anonymous usage to your account. Payments are handled by Paystack and we never see your card details. Please do not enter patient-identifying information."
+if "link your anonymous usage to your account" in _s:
+    print(f"skip    {_p} (privacy card already patched)")
+else:
+    _m = _re.search(r"No account\. The values you enter and your results stay on your device\..*?Please do not enter patient-identifying information\.", _s, _re.S)
+    if not _m:
+        sys.exit(f"Could not patch {_p}: the privacy card text was not found. Nothing was written for it.")
+    shutil.copyfile(_p, _p + ".bak2")
+    open(_p, "w", encoding="utf-8").write(_s[:_m.start()] + _new_card + _s[_m.end():])
+    print(f"patched {_p} (privacy card)")
+
+README_NEW = """
+## Accounts, plans, campaigns and the mobile app
+
+Clinexia works without an account. Accounts add premium plans, organisations, and admin tools. Everything is optional until you switch premium locking on.
+
+**What exists**
+- Accounts: `/register`, `/login`, `/account` (Supabase Auth). Individual and organisation accounts; organisation owners invite staff, assign specialties and manage seats.
+- Plans: Free, Specialty premium, All-access, in naira (Nigeria) or dollars (elsewhere), set by an admin. Paystack payments (one month each, no auto-renewal). Premium locking is OFF until `BILLING_ENFORCE_PREMIUM=true`.
+- Guests: 3 calculations per device once locking is on, then browse-only. Tools are labelled Free or Premium.
+- Admin: `/admin/accounts` (users, plans, suspend/delete with a notice, organisations, prices, audit, device history), `/admin/campaigns` (notices and review forms, scheduling, where they show, phone notifications), `/admin/setup` (checks this deployment).
+- Device linking: a device is linked to the account of the person who registers or signs in on it, so the admin shows their real name and full calculation history (tool names and times only).
+- Campaigns: notices and review forms shown on the website and in the Android app; answers and "remind me later" follow the account.
+- Phone notifications (Android) through Firebase Cloud Messaging; each notification stays on screen until it is closed.
+- The Android/mobile app (separate repo) uses this backend: accounts, plans and campaigns are shared.
+
+**Set up (once per Supabase project)**: run in the SQL editor, in order: `supabase/billing.sql`, `billing-admin.sql`, `billing-link.sql`, `campaigns.sql`, `push.sql` (and `analytics.sql` if not already). Then open `/admin/setup` to confirm.
+
+**Environment variables (Vercel)**
+| Variable | Needed for |
+|---|---|
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | everything (already used by analytics) |
+| `SUPABASE_ANON_KEY` | sign-in and registration |
+| `PAYSTACK_SECRET_KEY` | payments |
+| `FCM_SERVICE_ACCOUNT_JSON` | phone notifications |
+| `RESEND_API_KEY`, `BILLING_FROM_EMAIL` | emailed account notices (optional) |
+| `BILLING_ENFORCE_PREMIUM=true` | turn premium locking on (default off) |
+| `BILLING_ENABLED=false` | switch accounts off completely |
+| `MOBILE_ALLOWED_ORIGINS` | extra origins allowed to call the account APIs (testing) |
+
+Full details, limits and the mobile contract are in [`docs/billing.md`](docs/billing.md). The privacy policy (`/privacy`) and terms (`/terms`) describe how accounts, device linking, payments and notifications work.
+"""
+_r = load("README.md")
+if "## Accounts, plans, campaigns and the mobile app" in _r:
+    print("skip    README.md (already has the accounts section)")
+else:
+    shutil.copyfile("README.md", "README.md.bak")
+    _r = _r.replace("## Features\n", "## Features\n\n> New: accounts, premium plans, admin tools and an Android app that shares the same backend. See [Accounts, plans, campaigns and the mobile app](#accounts-plans-campaigns-and-the-mobile-app).\n", 1)
+    open("README.md", "w", encoding="utf-8").write(_r.rstrip() + "\n" + README_NEW)
+    print("patched README.md (accounts section)")
+
+# admin navigation: Setup check
+edit_only("components/admin/traction-ui.tsx", [
+    ('      {item("/admin/accounts", "Accounts management", "accounts")}\n', '      {item("/admin/accounts", "Accounts management", "accounts")}\n      {item("/admin/setup", "Setup check", "setup")}\n', 1),
+], "setup link")
+_a = load("app/admin/page.tsx")
+if "/admin/setup" not in _a and 'Campaigns</Link>' in _a:
+    shutil.copyfile("app/admin/page.tsx", "app/admin/page.tsx.bak")
+    _a = _a.replace('Campaigns</Link>', 'Campaigns</Link>\n          <Link href="/admin/setup" className="rounded-md border bg-background px-3 py-2 font-medium hover:bg-muted">Setup check</Link>', 1)
+    open("app/admin/page.tsx", "w", encoding="utf-8").write(_a)
+    print("patched app/admin/page.tsx (setup link)")
+else:
+    print("skip    app/admin/page.tsx (setup link)")
 
 PY
 echo "Done. Next: pnpm typecheck && pnpm dev"

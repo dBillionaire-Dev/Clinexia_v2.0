@@ -23,6 +23,8 @@ Clinexia is a complete clinical toolkit and progressive web app: medical calcula
 
 ## Features
 
+> New: accounts, premium plans, admin tools and an Android app that shares the same backend. See [Accounts, plans, campaigns and the mobile app](#accounts-plans-campaigns-and-the-mobile-app).
+
 - Clinical calculators, drug dosing with mg and mL per dose, and unit conversion for clinical and laboratory metrics  
 - Responsive layout, mobile & desktop friendly  
 - Real-time input validation and conversion feedback  
@@ -316,3 +318,33 @@ Prices are in Nigerian naira. Typical prices are estimates from the midpoints of
 
 ### Tests
 `lib/feedback/feedback.test.ts` covers the answer rules, when the popup shows, Later, done, never and new rounds, the submission and rate-limit checks and the admin summary.
+
+## Accounts, plans, campaigns and the mobile app
+
+Clinexia works without an account. Accounts add premium plans, organisations, and admin tools. Everything is optional until you switch premium locking on.
+
+**What exists**
+- Accounts: `/register`, `/login`, `/account` (Supabase Auth). Individual and organisation accounts; organisation owners invite staff, assign specialties and manage seats.
+- Plans: Free, Specialty premium, All-access, in naira (Nigeria) or dollars (elsewhere), set by an admin. Paystack payments (one month each, no auto-renewal). Premium locking is OFF until `BILLING_ENFORCE_PREMIUM=true`.
+- Guests: 3 calculations per device once locking is on, then browse-only. Tools are labelled Free or Premium.
+- Admin: `/admin/accounts` (users, plans, suspend/delete with a notice, organisations, prices, audit, device history), `/admin/campaigns` (notices and review forms, scheduling, where they show, phone notifications), `/admin/setup` (checks this deployment).
+- Device linking: a device is linked to the account of the person who registers or signs in on it, so the admin shows their real name and full calculation history (tool names and times only).
+- Campaigns: notices and review forms shown on the website and in the Android app; answers and "remind me later" follow the account.
+- Phone notifications (Android) through Firebase Cloud Messaging; each notification stays on screen until it is closed.
+- The Android/mobile app (separate repo) uses this backend: accounts, plans and campaigns are shared.
+
+**Set up (once per Supabase project)**: run in the SQL editor, in order: `supabase/billing.sql`, `billing-admin.sql`, `billing-link.sql`, `campaigns.sql`, `push.sql` (and `analytics.sql` if not already). Then open `/admin/setup` to confirm.
+
+**Environment variables (Vercel)**
+| Variable | Needed for |
+|---|---|
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | everything (already used by analytics) |
+| `SUPABASE_ANON_KEY` | sign-in and registration |
+| `PAYSTACK_SECRET_KEY` | payments |
+| `FCM_SERVICE_ACCOUNT_JSON` | phone notifications |
+| `RESEND_API_KEY`, `BILLING_FROM_EMAIL` | emailed account notices (optional) |
+| `BILLING_ENFORCE_PREMIUM=true` | turn premium locking on (default off) |
+| `BILLING_ENABLED=false` | switch accounts off completely |
+| `MOBILE_ALLOWED_ORIGINS` | extra origins allowed to call the account APIs (testing) |
+
+Full details, limits and the mobile contract are in [`docs/billing.md`](docs/billing.md). The privacy policy (`/privacy`) and terms (`/terms`) describe how accounts, device linking, payments and notifications work.

@@ -122,3 +122,13 @@
 - The app must use the website's full address, `https://www.clinexia.app` (not `clinexia.app`, which redirects and cannot be used for a POST from the app).
 - Testing the mobile app from your computer against the live website: add the origin you are testing from to the website's `MOBILE_ALLOWED_ORIGINS`
   (for example `http://localhost:3000`), redeploy, and remove it afterwards.
+
+## Linking devices to accounts (real name + history in the admin)
+- Run `supabase/billing-link.sql` once (after `analytics.sql` and `billing.sql`).
+- Every visitor is tracked by a random device ID. When a person registers or signs in on a device (website or app), that device is linked to their account, and the device's
+  automatic name ("User-XXXXXX") becomes the name they typed when registering (a name you typed by hand in the admin is never overwritten). Accounts made before this existed link
+  the next time that person opens the website or app while signed in.
+- Admin > Accounts management > Users > Details now lists the account's linked devices and its full calculation history (most used tools, time span, latest 100), including
+  everything done on those devices **before** they registered. You can also link or unlink a device by pasting its device ID.
+- A device used by more than one account stays linked to each. Only the first account renames it.
+- Privacy: this connects device activity to a named person, only after they register or sign in. Mention it in your privacy policy. The app skips linking when the person has analytics switched off.

@@ -5,6 +5,8 @@ import { canDeleteUser, cleanReason, confirmationMatches, suspendedMessage } fro
 import { composeNotice, sendEmail } from "./notify"
 import { corsHeadersFor, corsPath, isTrustedOrigin } from "./cors"
 import { accountNameFor, isDeviceId, summariseHistory } from "./history"
+import { explainSetupError, missingSqlHint } from "./setup-hints"
+import { summariseChecks } from "./setup-check"
 import { GUEST_CALC_LIMIT, isGuestLimited, noteGuestCalculation, readGuestCount, safeNextPath, writeSessionState } from "./guest"
 import { canUseCalculator, hasSpecialty, isPremiumCalculator, resolveEntitlements, type MembershipContext, type PlanRecord } from "./entitlements"
 import { addMonthsUtc, effectiveStatus, nextPeriodEnd } from "./lifecycle"
@@ -705,5 +707,34 @@ describe("linking devices to accounts (admin sees the real name and the whole hi
   it("handles an empty history and tells when the list was cut off", () => {
     expect(summariseHistory([])).toMatchObject({ total: 0, top: [], firstAt: null, lastAt: null })
     expect(summariseHistory(Array.from({ length: 5 }, () => ev("a", "A", "2026-10-01T00:00:00Z")), 5).capped).toBe(true)
+  })
+})
+
+describe("telling the admin exactly what is missing in production", () => {
+  it("names the SQL file for a missing table, column or function", () => {
+    expect(missingSqlHint("Could not find the table 'public.app_campaigns' in the schema cache (PGRST205)")).toContain("supabase/campaigns.sql")
+    expect(missingSqlHint("column billing_profiles.source does not exist")).toContain("supabase/billing-admin.sql")
+    expect(missingSqlHint("relation billing_device_links does not exist")).toContain("supabase/billing-link.sql")
+    expect(missingSqlHint("Could not find the table 'public.push_devices'")).toContain("supabase/push.sql")
+    expect(missingSqlHint("relation billing_organisations does not exist")).toContain("supabase/billing.sql")
+  })
+  it("says nothing about errors that are not missing pieces", () => {
+    expect(missingSqlHint("Supabase select failed (401): invalid key")).toBeNull()
+    expect(missingSqlHint("network down")).toBeNull()
+  })
+  it("still points at the missing sign-in key before anything else", () => {
+    expect(explainSetupError("SUPABASE_ANON_KEY is required")).toContain("SUPABASE_ANON_KEY")
+  })
+  it("summarises a check: required failures, optional gaps and which SQL files to run", () => {
+    const s = summariseChecks([
+      { group: "g", label: "a", ok: true, optional: false },
+      { group: "g", label: "b", ok: false, optional: false, fix: "supabase/campaigns.sql" },
+      { group: "g", label: "c", ok: false, optional: false, fix: "supabase/campaigns.sql" },
+      { group: "g", label: "d", ok: false, optional: true, fix: "Add PAYSTACK_SECRET_KEY" },
+      { group: "g", label: "e", ok: false, optional: false, fix: "Add SUPABASE_ANON_KEY" },
+    ])
+    expect(s).toMatchObject({ failed: 3, optionalMissing: 1, ready: false })
+    expect(s.files).toEqual(["supabase/campaigns.sql"])
+    expect(summariseChecks([{ group: "g", label: "a", ok: true, optional: false }]).ready).toBe(true)
   })
 })

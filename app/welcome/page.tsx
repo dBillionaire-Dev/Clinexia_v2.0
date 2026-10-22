@@ -55,10 +55,11 @@ export default function WelcomePage() {
   ]
 
   const faqs = [
-    { q: "Do I need an account?", a: "No. Open it and start calculating." },
+    { q: "Do I need an account?", a: "Not to try it. Open it and start calculating; without an account you can run a few calculations on each device. Create a free account to keep going, and choose a premium plan for specialty tools such as laboratory, pharmacy, renal, cardiology and oncology." },
+    { q: "What is free and what is premium?", a: "Some tools are free. Specialty tools are premium: pay monthly for the specialties you use, or choose All-access. Prices are shown in naira in Nigeria and in dollars elsewhere, and each tool is labelled Free or Premium in the app. Organisations can buy seats for their staff." },
     { q: "Does it work offline?", a: "Yes. Once the web app is installed (or has been opened once), it keeps working without a connection. The Android app does not need the internet to calculate." },
     { q: "How do I get it on my phone?", a: androidReady ? "On Android, use the Google Play or download button on this page. On any phone you can also install the web app: on iPhone use Share, then Add to Home Screen; on Android Chrome use Install app." : "The Android app is on its way. Until then, install the web app: on iPhone use Share, then Add to Home Screen; on Android Chrome use the menu, then Install app." },
-    { q: "Where is my data stored?", a: "History, favorites and settings stay on your device. Clinexia counts anonymous usage (which tool was used, never the values you enter) to understand how many people use it and which tools matter." },
+    { q: "Where is my data stored?", a: "History, favorites and settings stay on your device, and the values you enter and your results are never sent to us. Without an account Clinexia counts anonymous usage (which tool was used, never the values). If you create an account we keep your name, email and plan, and link your devices' usage to your account so we can support you." },
     { q: "Can I rely on the results clinically?", a: "Clinexia is a calculation and reference utility, not a medical device. It does not replace clinical judgement, local protocols, a formulary or validated laboratory procedures. Always check results before acting on them." },
     { q: "Where do the formulas come from?", a: "Each calculator lists its formula, limitations and source with a version and the date it was last verified, so you can check the original." },
   ]
@@ -98,7 +99,7 @@ export default function WelcomePage() {
             </div>
             <ul className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
               <li className="flex items-center gap-2"><WifiOff className="h-4 w-4 text-primary" aria-hidden />Works offline</li>
-              <li className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" aria-hidden />No account needed</li>
+              <li className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" aria-hidden />Try it without an account</li>
               <li className="flex items-center gap-2"><BookOpenText className="h-4 w-4 text-primary" aria-hidden />Formulas and sources shown</li>
             </ul>
           </div>
@@ -191,7 +192,7 @@ export default function WelcomePage() {
           <div className="rounded-xl border bg-card p-6">
             <ShieldCheck className="h-7 w-7 text-primary" aria-hidden />
             <h2 className="mt-3 text-xl font-semibold">Private by design</h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">No account. The values you enter and your results stay on your device. Clinexia counts anonymous usage (which tool was used, never the numbers) so we can see how many people use it and which tools matter. Please do not enter patient-identifying information.</p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">Your calculations stay on your device: the values you enter and your results are never sent to us. You can use Clinexia without an account. If you create one, we keep your name, email and plan, and link your anonymous usage to your account. Payments are handled by Paystack and we never see your card details. Please do not enter patient-identifying information.</p>
           </div>
           <div className="rounded-xl border border-amber-300/60 bg-amber-50 p-6 dark:border-amber-500/30 dark:bg-amber-950/30">
             <BookOpenText className="h-7 w-7 text-amber-700 dark:text-amber-400" aria-hidden />
@@ -220,7 +221,7 @@ export default function WelcomePage() {
       <section className="py-16">
         <div className="mx-auto max-w-3xl px-4 text-center">
           <h2 className="text-3xl font-bold tracking-tight">Ready when you are.</h2>
-          <p className="mt-3 text-muted-foreground">Open it now. No sign-up, no setup.</p>
+          <p className="mt-3 text-muted-foreground">Open it now. Try it without signing up.</p>
           <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
             <Button asChild size="lg"><AppLink path="/">Open the web app<ArrowRight className="ml-2 h-4 w-4" aria-hidden /></AppLink></Button>
             <AndroidButton variant="secondary" />

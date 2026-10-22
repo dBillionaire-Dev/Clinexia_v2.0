@@ -2,6 +2,7 @@ import { createVerify, generateKeyPairSync } from "node:crypto"
 import { describe, expect, it } from "vitest"
 import { buildJwt, buildMessage, parseServiceAccount, sendOne, sendToDevices, type ServiceAccount } from "./fcm"
 import { validatePush, validPushToken } from "./validate"
+import { markSeen, parseSeen, unseen } from "./inbox"
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048, publicKeyEncoding: { type: "spki", format: "pem" }, privateKeyEncoding: { type: "pkcs8", format: "pem" } })
 const sa: ServiceAccount = { client_email: "svc@proj.iam.gserviceaccount.com", private_key: privateKey, project_id: "proj" }
@@ -76,5 +77,31 @@ describe("sending", () => {
     expect(r.unregistered.length).toBe(3)
     expect(r.failed).toBe(2) // tokens ending in 7: 7 and 17
     expect(r.sent).toBe(20)
+  })
+})
+
+describe("notifications that last until the person closes them", () => {
+  it("carries the message id so the app knows what it already showed", () => {
+    expect(buildMessage(TOKEN, { title: "a", body: "b", url: "/x", id: "m1" }).message.data).toEqual({ url: "/x", id: "m1" })
+    expect(buildMessage(TOKEN, { title: "a", body: "b", id: "m1" }).message.data).toEqual({ id: "m1" })
+  })
+  const msg = (id: string, at: string) => ({ id, title: id, body: "", url: "", createdAt: at })
+  const NOW = Date.parse("2026-11-10T12:00:00Z")
+  it("shows each notification until it is closed, oldest first, and never twice", () => {
+    const list = [msg("b", "2026-11-09T10:00:00Z"), msg("a", "2026-11-08T10:00:00Z")]
+    expect(unseen(list, [], NOW).map((m) => m.id)).toEqual(["a", "b"])
+    expect(unseen(list, markSeen([], "a"), NOW).map((m) => m.id)).toEqual(["b"])
+    expect(unseen(list, ["a", "b"], NOW)).toEqual([])
+  })
+  it("drops notifications older than a week", () => {
+    expect(unseen([msg("old", "2026-10-01T00:00:00Z")], [], NOW)).toEqual([])
+  })
+  it("keeps a bounded, safe list of what was seen", () => {
+    expect(parseSeen("junk")).toEqual([])
+    expect(parseSeen('[1,"a"]')).toEqual(["a"])
+    let seen: string[] = []
+    for (let i = 0; i < 80; i++) seen = markSeen(seen, `m${i}`)
+    expect(seen.length).toBe(50)
+    expect(markSeen(["a"], "a")).toEqual(["a"])
   })
 })

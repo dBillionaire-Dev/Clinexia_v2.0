@@ -40,10 +40,10 @@ export async function getAccessToken(sa: ServiceAccount, fetchImpl: typeof fetch
   return j.access_token
 }
 
-export interface PushPayload { title: string; body: string; url?: string }
+export interface PushPayload { title: string; body: string; url?: string; id?: string }
 
 export function buildMessage(token: string, p: PushPayload) {
-  return { message: { token, notification: { title: p.title, body: p.body }, data: p.url ? { url: p.url } : {}, android: { priority: "HIGH" } } }
+  return { message: { token, notification: { title: p.title, body: p.body }, data: { ...(p.url ? { url: p.url } : {}), ...(p.id ? { id: p.id } : {}) }, android: { priority: "HIGH" } } }
 }
 
 export type SendResult = "sent" | "unregistered" | "failed"
