@@ -227,6 +227,7 @@ export function CampaignsAdmin() {
       </div>
       {note && <p role="status" className="rounded-md border p-2 text-sm">{note}</p>}
       {error && <p role="alert" className="rounded-md border border-destructive/40 p-3 text-sm text-destructive">{error}</p>}
+      {error && <p className="text-sm"><Link href="/admin/setup" className="underline">Open the setup check</Link> to see exactly what is missing.</p>}
       {list === null ? <Loader2 className="h-5 w-5 animate-spin" aria-label="Loading" /> : list.length === 0 && !error ? <p className="rounded-lg border p-4 text-sm text-muted-foreground">No campaigns yet. Start with a review form or an announcement.</p> : (
         <ul className="divide-y rounded-lg border">
           {list.map((c) => (

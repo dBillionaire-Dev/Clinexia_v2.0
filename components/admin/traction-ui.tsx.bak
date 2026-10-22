@@ -27,6 +27,8 @@ export function AdminNav({ current }: { current: "overview" | "report" | "revenu
       {item("/admin/traction/report", "Buyer report", "report")}
       {item("/admin/traction/revenue", "Revenue", "revenue")}
       {item("/admin/feedback", "Feedback", "feedback")}
+      {item("/admin/campaigns", "Campaigns", "campaigns")}
+      {item("/admin/accounts", "Accounts management", "accounts")}
     </nav>
   )
 }

@@ -47,3 +47,14 @@ export async function loadDeviceHistory(userId: string) {
     events,
   }
 }
+
+/** Links devices already known to belong to an account and gives them the account's name. Safe to repeat. */
+export async function backfillDeviceLinks(): Promise<{ linksAdded: number; renamed: number }> {
+  const r = await db.rpc<{ links_added: number; renamed: number }>("billing_backfill_device_links", {})
+  return { linksAdded: r?.links_added ?? 0, renamed: r?.renamed ?? 0 }
+}
+
+/** Before an account is deleted: take its name off the device records. Best effort. */
+export async function forgetUserDevices(userId: string): Promise<void> {
+  try { await db.rpc("billing_forget_user_devices", { p_user: uuid(userId) }) } catch (error) { console.error("Clinexia forget devices failed:", error instanceof Error ? error.message : "unknown") }
+}

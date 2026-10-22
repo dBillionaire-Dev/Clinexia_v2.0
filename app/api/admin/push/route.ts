@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import { isAdminAuthenticated } from "@/lib/admin-auth"
+import { errorText, explainSetupError } from "@/lib/billing/setup-hints"
 import { parseServiceAccount, sendToDevices } from "@/lib/push/fcm"
-import { deviceCounts, listMessages, listTokens, removeTokens, saveMessage } from "@/lib/push/store"
+import { createMessage, deviceCounts, finishMessage, listMessages, listTokens, removeTokens } from "@/lib/push/store"
 import { validatePush } from "@/lib/push/validate"
 
 export const dynamic = "force-dynamic"
@@ -14,8 +15,8 @@ export async function GET() {
   try {
     const [devices, messages] = await Promise.all([deviceCounts(), listMessages()])
     return out({ configured: parseServiceAccount(process.env.FCM_SERVICE_ACCOUNT_JSON) !== null, devices, messages })
-  } catch {
-    return out({ error: "Could not load. Have you run supabase/push.sql?" }, 500)
+  } catch (error) {
+    return out({ error: explainSetupError(errorText(error)) ?? `Could not load: ${errorText(error).slice(0, 200)}` }, 500)
   }
 }
 
@@ -36,9 +37,10 @@ export async function POST(request: Request) {
   try {
     const tokens = await listTokens(checked.value.audience)
     if (tokens.length === 0) return out({ error: "No phones are registered for that audience yet." }, 409)
-    const result = await sendToDevices(sa, tokens, { title: checked.value.title, body: checked.value.body, url: checked.value.url || undefined })
+    const id = await createMessage(checked.value) // saved first: the app also shows it from here if the phone notification was missed
+    const result = await sendToDevices(sa, tokens, { title: checked.value.title, body: checked.value.body, url: checked.value.url || undefined, id })
     if (result.unregistered.length) await removeTokens(result.unregistered)
-    await saveMessage({ ...checked.value, sent: result.sent, failed: result.failed, removed: result.unregistered.length })
+    await finishMessage(id, { sent: result.sent, failed: result.failed, removed: result.unregistered.length })
     return out({ ok: true, sent: result.sent, failed: result.failed, removed: result.unregistered.length })
   } catch (error) {
     console.error("Clinexia push send error:", error instanceof Error ? error.message : "unknown")

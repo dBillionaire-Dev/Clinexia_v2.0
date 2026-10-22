@@ -156,6 +156,7 @@ export default async function AdminPage() {
           <Link href="/admin/traction/revenue" className="rounded-md border bg-background px-3 py-2 font-medium hover:bg-muted">Revenue</Link>
           <Link href="/admin/feedback" className="rounded-md border bg-background px-3 py-2 font-medium hover:bg-muted">Feedback</Link>
           <Link href="/admin/campaigns" className="rounded-md border bg-background px-3 py-2 font-medium hover:bg-muted">Campaigns</Link>
+          <Link href="/admin/setup" className="rounded-md border bg-background px-3 py-2 font-medium hover:bg-muted">Setup check</Link>
           <Link href="/admin/accounts" className="rounded-md border bg-background px-3 py-2 font-medium hover:bg-muted">Accounts management</Link>
         </nav>
 

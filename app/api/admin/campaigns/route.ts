@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { isAdminAuthenticated } from "@/lib/admin-auth"
 import { isUuid } from "@/lib/billing/db"
+import { errorText, explainSetupError } from "@/lib/billing/setup-hints"
 import { cleanCampaignInput } from "@/lib/campaigns/model"
 import { createCampaign, deleteCampaign, deleteCampaignResponse, getCampaign, listCampaignResponses, listCampaignsWithCounts, setCampaignStatus, showAgain, updateCampaign } from "@/lib/campaigns/server"
 
@@ -20,7 +21,9 @@ export async function GET(request: Request) {
     }
     return out({ campaigns: await listCampaignsWithCounts() })
   } catch (error) {
-    return out({ error: error instanceof Error && /app_campaigns|PGRST205|42P01/.test(error.message) ? "The campaign tables are missing. Run supabase/campaigns.sql in the Supabase SQL editor." : "Could not load campaigns." }, 500)
+    const message = errorText(error)
+    console.error("Clinexia admin campaigns failed:", message)
+    return out({ error: explainSetupError(message) ?? `Could not load campaigns: ${message.slice(0, 200)}` }, 500)
   }
 }
 

@@ -17,6 +17,45 @@ const sections: { title: string; body: string[] }[] = [
     ],
   },
   {
+    title: "Accounts",
+    body: [
+      "You can use many tools without an account. Some features need one. When you register you give a real email address and your name, keep your password to yourself, and keep your details up to date.",
+      "An account is for one person. Do not share a login: organisations give each member of staff their own account. You are responsible for what happens under your account.",
+    ],
+  },
+  {
+    title: "Free use and limits without an account",
+    body: [
+      "Some tools are free and some are premium, and the app labels which is which. Without an account you can run a limited number of calculations on each device; after that you can keep browsing but you need an account to keep calculating. We may change which tools are free or premium and how many calculations guests get.",
+    ],
+  },
+  {
+    title: "Plans and payments",
+    body: [
+      "Premium tools are paid. You can buy access to the specialties you choose, or All-access. Prices are shown before you pay, in naira for Nigeria and in dollars elsewhere. Prices can change; a change applies to your next payment, not to one you have already made.",
+      "Each payment covers one month and does not renew by itself, so to keep access you pay again. If you cancel, you keep access until the end of the month you paid for. Choosing a different plan starts a new month from the day you pay, and unused time on the old plan is not credited. After a plan ends there may be a short grace period.",
+      "Payments are processed by Paystack. We never see or store your card details. If you think a payment was taken in error, contact us and we will look into it.",
+    ],
+  },
+  {
+    title: "Organisations",
+    body: [
+      "An organisation account is run by its owner, who chooses the plan and the number of seats, pays for it and invites staff. Owners and administrators can invite and remove members and decide which specialties each member can use. A seat is for one named person. An invitation reserves a seat until it is accepted, withdrawn or expires. The owner is responsible for the people they invite. Any discount for centrally managed organisations applies only after we have verified it.",
+    ],
+  },
+  {
+    title: "Messages and notifications",
+    body: [
+      "We may show notices and short review forms in the app and on the website, and, if you turn them on, send notifications to your phone. You can close them, and you can switch phone notifications off in your phone's settings.",
+    ],
+  },
+  {
+    title: "Suspension and deletion",
+    body: [
+      "We may suspend or delete an account that is misused, for example by sharing a login, fraud, abuse of the service or the payment system, or attempts to get around limits. We will tell you why. While an account is suspended you cannot sign in. Deleting an account is permanent: it removes the profile, memberships and subscription, and any paid time is lost. You can ask us to delete your account at any time.",
+    ],
+  },
+  {
     title: "Not medical advice, not a medical device",
     body: [
       "Clinexia provides calculations and estimates for educational and clinical reference use. It does not provide medical advice, diagnosis or treatment, and it does not replace the judgement of a qualified professional, local protocols, product information, a formulary or validated laboratory procedures.",
@@ -39,7 +78,7 @@ const sections: { title: string; body: string[] }[] = [
   {
     title: "Availability and changes",
     body: [
-      "The app may change, be interrupted or be withdrawn at any time. Features may become paid in the future; if that happens we will say so in the app. Offline use depends on your device having saved the app.",
+      "The app may change, be interrupted or be withdrawn at any time. Some tools are free and some are premium, as described above. Offline use depends on your device having saved the app.",
     ],
   },
   {

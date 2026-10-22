@@ -5,6 +5,7 @@ import { setSessionCookies, signInUser, userFromAccessToken } from "@/lib/billin
 import { getUserStatus } from "@/lib/billing/store"
 import { suspendedMessage } from "@/lib/billing/admin-rules"
 import { errorText, explainSetupError } from "@/lib/billing/setup-hints"
+import { linkDevice } from "@/lib/billing/devices"
 import { isEmail, normalizeEmail } from "@/lib/billing/invitations"
 
 export const dynamic = "force-dynamic"
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
   }
   if (!user || !status) return unavailable(new Error("Supabase did not return the signed-in user"))
   if (status.status === "suspended") return problem(suspendedMessage(status.notice), 403) // no session is created
+  await linkDevice(user.id, user.email, body?.anonymousId) // this device now belongs to this account in the admin
   // The website keeps the session in secure cookies. The mobile apps cannot use cookies across sites, so they receive the tokens
   // once and send them as "Authorization: Bearer" afterwards.
   if (clientSource(request) !== "web") return json({ ok: true, session: { access_token: session.access_token, refresh_token: session.refresh_token, expires_in: session.expires_in ?? 3600 } })

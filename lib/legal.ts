@@ -20,4 +20,4 @@ export const CLINICAL_NOTICE_BODY =
 export const SHARE_FOOTER =
   "Calculation aid only. Verify against current guidelines and local protocol before clinical use."
 
-export const TERMS_LAST_UPDATED = "12 October 2026"
+export const TERMS_LAST_UPDATED = "20 October 2026"
