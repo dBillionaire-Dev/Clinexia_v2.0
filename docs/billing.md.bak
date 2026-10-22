@@ -132,3 +132,12 @@
   everything done on those devices **before** they registered. You can also link or unlink a device by pasting its device ID.
 - A device used by more than one account stays linked to each. Only the first account renames it.
 - Privacy: this connects device activity to a named person, only after they register or sign in. Mention it in your privacy policy. The app skips linking when the person has analytics switched off.
+
+## Setup check, device names and notifications (latest)
+- **Admin > Setup check** (`/admin/setup`) tests THIS deployment: every table, column, function and environment variable the accounts, campaigns and notifications need, and lists
+  exactly which SQL file to run or which variable to add. If Campaigns or Users do not load in production, open it first: production is a separate Supabase project from
+  your local one, so each SQL file must be run there too, and Vercel needs its own environment variables (followed by a redeploy).
+- **Device names**: run `supabase/billing-link.sql` again to add two functions. Accounts > "Link devices from existing activity" links phones that registered for notifications or
+  answered a form while signed in, and gives every linked device its account's name (an admin-typed name is never overwritten). Deleting an account takes its name off the devices.
+- **Notifications stay until closed**: in the Android app a tapped notification opens the app and shows as a pop-up, every notification stays until closed, and missed ones appear when the
+  app opens (`GET /api/push/recent`, last 7 days, filtered by signed-in or guest). New notifications are saved before they are sent so the app can recognise them.

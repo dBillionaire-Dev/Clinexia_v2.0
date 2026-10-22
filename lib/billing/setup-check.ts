@@ -16,6 +16,9 @@ const TABLES: Array<[string, string, string, string]> = [
   ["Campaigns", "Campaigns", "app_campaigns?select=id,platforms&limit=1", "supabase/campaigns.sql"],
   ["Campaigns", "Answers linked to accounts", "app_campaign_responses?select=id,user_id&limit=1", "supabase/campaigns.sql"],
   ["Campaigns", "Reminders that follow the account", "app_campaign_parked?select=user_id&limit=1", "supabase/campaigns.sql"],
+  ["Emails", "Invitation email tracking", "billing_invitations?select=emailed_at&limit=1", "supabase/email-notifications.sql"],
+  ["Emails", "Receipt email tracking", "billing_orders?select=receipt_sent_at&limit=1", "supabase/email-notifications.sql"],
+  ["Emails", "Plan-ending reminder tracking", "billing_subscriptions?select=reminder_sent_for&limit=1", "supabase/email-notifications.sql"],
   ["Phone notifications", "Registered phones and sent messages", "push_devices?select=token&limit=1", "supabase/push.sql"],
   ["Phone notifications", "Sent messages", "push_messages?select=id&limit=1", "supabase/push.sql"],
   ["Analytics (already in place)", "Devices and calculation events", "convertlab_devices?select=anonymous_id&limit=1", "supabase/analytics.sql"],
@@ -47,7 +50,8 @@ export async function runSetupCheck(env: Record<string, string | undefined> = pr
   setting("SUPABASE_ANON_KEY (sign-in)", has("SUPABASE_ANON_KEY"), false, "Add SUPABASE_ANON_KEY (Supabase > Project Settings > API > anon public key)")
   setting("PAYSTACK_SECRET_KEY (payments)", has("PAYSTACK_SECRET_KEY"), true, "Add PAYSTACK_SECRET_KEY to take payments")
   setting("FCM_SERVICE_ACCOUNT_JSON (phone notifications)", parseServiceAccount(env.FCM_SERVICE_ACCOUNT_JSON) !== null, true, "Add FCM_SERVICE_ACCOUNT_JSON (Firebase service account key) to send notifications")
-  setting("RESEND_API_KEY + BILLING_FROM_EMAIL (emailed notices)", has("RESEND_API_KEY") && has("BILLING_FROM_EMAIL"), true, "Add both to email people about suspensions, deletions and plan changes")
+  setting("RESEND_API_KEY + BILLING_FROM_EMAIL (emailed notices)", has("RESEND_API_KEY") && has("BILLING_FROM_EMAIL"), true, "Add both to email invitations, receipts, plan reminders and account notices (the sending domain must be verified in Resend)")
+  setting("CRON_SECRET (daily plan-ending reminders)", has("CRON_SECRET"), true, "Add CRON_SECRET (any long random string) in Vercel; vercel.json then runs the reminder job daily")
   setting("Accounts switched on (BILLING_ENABLED is not 'false')", env.BILLING_ENABLED !== "false", false, "Remove BILLING_ENABLED=false")
 
   if (!has("SUPABASE_URL") || !has("SUPABASE_SERVICE_ROLE_KEY")) return out

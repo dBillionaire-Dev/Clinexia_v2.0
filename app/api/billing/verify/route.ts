@@ -2,6 +2,7 @@ import { applyVerifiedPayment } from "@/lib/billing/payments"
 import { guard, isResponse, json, problem, readJson, requireUser } from "@/lib/billing/route-kit"
 import { createPaystack } from "@/lib/billing/paystack"
 import { getOrder, paymentStore } from "@/lib/billing/store"
+import { publicBaseUrl, sendReceiptForOrder } from "@/lib/billing/email-flows"
 
 export const dynamic = "force-dynamic"
 
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
   if (order.status === "paid") return json({ status: "paid" })
 
   try {
-    const r = await applyVerifiedPayment(reference, createPaystack(secret), paymentStore)
+    const r = await applyVerifiedPayment(reference, createPaystack(secret), { ...paymentStore, onPaid: async (ref) => { await sendReceiptForOrder(ref, publicBaseUrl(new URL(request.url).origin)) } })
     if (r.ok) return json({ status: "paid" })
     return json({ status: r.reason === "not_successful" ? "pending" : "failed" })
   } catch {

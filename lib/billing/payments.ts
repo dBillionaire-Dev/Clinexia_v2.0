@@ -14,6 +14,8 @@ export interface PaymentStore {
   /** Atomic and idempotent: marks the order paid and activates the subscription in one transaction (billing_apply_paid_order). */
   applyPaidOrder(input: { reference: string; amountMinor: number; currency: string; providerId: string }): Promise<ApplyResult>
   audit(event: { action: string; detail: Record<string, unknown> }): Promise<void>
+  /** Optional: called after an order is confirmed paid (also on a repeat delivery, so a receipt that failed can be retried). Must be idempotent. */
+  onPaid?(reference: string): Promise<void>
 }
 
 export async function applyVerifiedPayment(reference: string, provider: PaymentProvider, store: PaymentStore): Promise<ApplyResult | { ok: false; reason: "not_successful" }> {
@@ -21,6 +23,7 @@ export async function applyVerifiedPayment(reference: string, provider: PaymentP
   if (tx.status !== "success") return { ok: false, reason: "not_successful" }
   const result = await store.applyPaidOrder({ reference: tx.reference, amountMinor: tx.amountMinor, currency: tx.currency, providerId: tx.providerId })
   if (!result.ok) await store.audit({ action: `payment.${result.reason}`, detail: { reference: tx.reference, amountMinor: tx.amountMinor, currency: tx.currency } })
+  else if (store.onPaid) await store.onPaid(tx.reference).catch(() => undefined) // an email problem must never undo or fail a payment
   return result
 }
 

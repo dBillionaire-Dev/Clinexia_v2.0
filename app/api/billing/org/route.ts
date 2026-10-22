@@ -5,6 +5,8 @@ import { can } from "@/lib/billing/roles"
 import { failure, guard, isResponse, json, problem, readJson, requireUser } from "@/lib/billing/route-kit"
 import { getPricing, orgStore, recordAudit, setManagedStatus } from "@/lib/billing/store"
 import { validateOrganisation } from "@/lib/billing/validation"
+import { emailInvitations, publicBaseUrl } from "@/lib/billing/email-flows"
+import { emailConfigured } from "@/lib/billing/notify"
 
 export const dynamic = "force-dynamic"
 
@@ -49,9 +51,22 @@ export async function POST(request: Request) {
     case "invite": {
       const r = await inviteMembers(orgStore, actor, str(body.orgId), { emails: str(body.emails), role: body.role === "admin" ? "admin" : "staff", specialties: body.specialties, allSpecialties: body.allSpecialties === true }, s)
       if (!r.ok) return failure(r)
-      // Invitation links are returned to the inviter once (only hashes are stored); sending the email is left to the inviter for now.
+      // Each invitee is emailed automatically (Resend). The private link is still returned once to the inviter (only hashes are
+      // stored) as a backup, and `emailed` says whether the email went out, so the screen can ask them to share it themselves.
       const origin = new URL(request.url).origin
-      return json({ created: r.created.map((c) => ({ email: c.email, link: `${origin}/account/join?token=${encodeURIComponent(c.token)}` })), skipped: r.skipped })
+      const base = publicBaseUrl(origin)
+      const org = await orgStore.getOrg(str(body.orgId))
+      const emailed = await emailInvitations({
+        orgId: str(body.orgId), orgName: org?.name ?? "", inviterId: user.id, inviterEmail: user.email, role: body.role === "admin" ? "admin" : "staff",
+        expiresAt: new Date(s.now + s.invitationTtlHours * 3_600_000).toISOString(), baseUrl: base, created: r.created,
+      })
+      const sentCount = Object.values(emailed).filter(Boolean).length
+      if (sentCount > 0) await recordAudit({ orgId: str(body.orgId), actorUserId: user.id, action: "invite.emailed", detail: { count: sentCount } })
+      return json({
+        emailConfigured: emailConfigured(),
+        created: r.created.map((c) => ({ email: c.email, emailed: emailed[c.email] === true, link: `${origin}/account/join?token=${encodeURIComponent(c.token)}` })),
+        skipped: r.skipped,
+      })
     }
     case "revoke": {
       const r = await revokeInvitation(orgStore, actor, str(body.orgId), str(body.inviteId))
