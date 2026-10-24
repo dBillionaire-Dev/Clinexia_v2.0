@@ -52,3 +52,30 @@ _Filled in by Phases 1-8._
 
 - Should dosing / oncology calculators be embeddable by partners at all, or only after a per-partner opt-in?
 - Partner onboarding for `embed_partners` (who adds origins, how they are verified). Run `supabase/embed-partners.sql` once in the Supabase SQL editor.
+
+## Phase 2 (clinical coding metadata and unit normalisation)
+
+### UNVERIFIED
+
+- **Every LOINC code** in `lib/calculators/coding-metadata.ts` (written without access to loinc.org). All pass the LOINC mod-10 check digit (tested), which only catches typos. Run `node --experimental-strip-types scripts/verify-loinc.mjs <Loinc.csv>` and read the printed names. Codes used: 2160-0 creatinine (mass), 29463-7 body weight, 8302-2 body height, 3094-0 urea nitrogen, 2345-7 glucose, 17861-6 calcium, 1751-7 albumin, 2951-2 sodium, 2075-0 chloride, 1963-8 bicarbonate, 2093-3 total cholesterol, 2085-9 HDL, 2571-8 triglycerides, 718-7 hemoglobin, 4544-3 hematocrit, 789-8 RBC, 6690-2 WBC, 5902-2 prothrombin time, 8480-6 systolic BP, 8462-4 diastolic BP, 8867-4 heart rate; results: 98979-8 eGFR (believed CKD-EPI 2021, which is the formula shown), 33914-3 eGFR (believed MDRD), 39156-5 BMI, 8277-6 BSA, 33037-3 anion gap, 43396-1 non-HDL cholesterol, 8478-0 mean arterial pressure.
+- The brief suggested 2160-0, 14682-9, 29463-7 and 8302-2; they were also not checked here. 14682-9 (creatinine, moles/volume) is not used because the calculators take mg/dL.
+- **No code is given** (UCUM only) where it could not be recalled with confidence: QT interval, Cockcroft-Gault CrCl, estimated osmolality, red cell indices outputs, INR (the input is PT).
+- UCUM strings (`10*9/L`, `mm[Hg]`, `/min`, `a`, `mL/min/{1.73_m2}`, `mosm/kg`) follow the UCUM specification but were not machine-validated. Validate with a UCUM library before publishing.
+- Molecular weights used for mass/molar conversion come from `lib/conversions/molar-mass.ts` (not independently checked).
+
+### Behaviour worth knowing
+
+- Conversion factors come from the engine's molecular weights, so results can differ from textbook factors in the 4th digit: 88 µmol/L creatinine is 0.99546 mg/dL here (the 88.4 rule gives 0.99548); 5.5 mmol/L glucose is exactly 99 mg/dL (MW 180.0; the usual 18.016 factor gives 99.09). The existing "Creatinine Unit Conversion" calculator uses 88.4 and was not touched.
+- Inch and foot are not in the public conversion table. They are added to a local copy for the normaliser only (exact by definition); the conversion tool is unchanged.
+- Required inputs are never defaulted (a missing `sex` is an error), unlike the web form which pre-selects "male".
+- Mass to molar is refused for BUN (urea nitrogen is not urea) and albumin (no molar mass defined). Drug-dose inputs (mg etc.) and inputs with no fixed unit accept only plain values.
+- The LDL Friedewald lipid values share one unit select, so they take plain values plus that select; per-value units are refused.
+- No registered calculator takes a temperature; temperature conversion is implemented and tested on a synthetic definition.
+- `normaliseInputs` is not yet used by any endpoint; Phase 4 (API) and Phase 6 (SMART) call it. Today only deep links use it (`?creatinine=88&creatinine_unit=umol/L`).
+- Coding metadata is applied by the registry from one table; no definition file or formula changed. Dosing and oncology calculators have none (tested).
+
+### Decisions needed
+
+- Which factors are authoritative for lab interoperability: the engine's molecular weights or the conventional rounded factors (88.4, 18.016, 0.2495 ...)? A lab may expect the conventional ones.
+- Should mEq/L be accepted for sodium, potassium, chloride and bicarbonate (1 mEq = 1 mmol for these)? Not supported today.
+- Should inch and foot be added to the public conversion tool?

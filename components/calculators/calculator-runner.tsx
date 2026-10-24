@@ -25,6 +25,7 @@ import { getDosingSafetyWarnings, validateCalculatorInputBounds } from "@/lib/ca
 import { getCalculatorSafetyWarnings } from "@/lib/calculators/calculation-safety"
 import { getCalculatorReferences } from "@/lib/calculators/dosing-references"
 import { parsePrefill } from "@/lib/integration/prefill"
+import { prefillUnitResolver } from "@/lib/integration/normalise"
 import {
   buildReadyMessage,
   buildResultMessage,
@@ -71,7 +72,7 @@ function CalculatorRunnerInner({ calculatorId, embed }: { calculatorId: string; 
   useEffect(() => {
     if (!definition || prefillAppliedRef.current) return
     prefillAppliedRef.current = true
-    const prefill = parsePrefill(definition, new URLSearchParams(window.location.search))
+    const prefill = parsePrefill(definition, new URLSearchParams(window.location.search), { unitResolver: prefillUnitResolver })
     if (Object.keys(prefill.values).length === 0) return
     const merged = { ...defaultValues(definition), ...prefill.values }
     setValues(merged)
@@ -86,7 +87,7 @@ function CalculatorRunnerInner({ calculatorId, embed }: { calculatorId: string; 
       if (!isTrustedParentMessage(event, parentOrigin, window.parent)) return
       const message = parsePrefillMessage(event.data)
       if (!message) return
-      const prefill = parsePrefill(definition, message.values)
+      const prefill = parsePrefill(definition, message.values, { unitResolver: prefillUnitResolver })
       const merged = { ...valuesRef.current, ...prefill.values }
       if (Object.keys(prefill.values).length > 0) setValues(merged)
       if (message.calculate) void handleCalculateRef.current?.(merged)
