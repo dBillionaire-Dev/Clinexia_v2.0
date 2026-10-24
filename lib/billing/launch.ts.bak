@@ -1,0 +1,40 @@
+// Whether premium calculators are locked, and whether everyone is still inside the free-trial period. Pure; the stored
+// state (set from the admin page) comes from launch-store.ts. The old BILLING_ENFORCE_PREMIUM=true setting still works
+// and forces locking on, so nothing changes for anyone who already uses it.
+import { billingEnabled } from "./config"
+
+export interface LaunchState { enforce: boolean; freeUntil: string | null }
+export const NO_LAUNCH: LaunchState = { enforce: false, freeUntil: null }
+
+export interface LaunchStatus {
+  /** Locks apply right now (switched on and the free trial is over or absent). */
+  enforced: boolean
+  /** Switched on, but everyone still has full access until freeUntil. */
+  trial: boolean
+  freeUntil: string | null
+  /** Switched on by either the admin button or the environment setting. */
+  switchedOn: boolean
+  adminOn: boolean
+  envForced: boolean
+}
+
+export function resolveLaunch(state: LaunchState, env: Record<string, string | undefined>, now: number): LaunchStatus {
+  const on = billingEnabled(env)
+  const envForced = on && env.BILLING_ENFORCE_PREMIUM === "true"
+  const adminOn = on && state.enforce
+  const switchedOn = envForced || adminOn
+  const end = state.freeUntil ? Date.parse(state.freeUntil) : NaN
+  const hasEnd = Number.isFinite(end)
+  const trial = switchedOn && hasEnd && now < end
+  return { enforced: switchedOn && !trial, trial, freeUntil: switchedOn && hasEnd ? state.freeUntil : null, switchedOn, adminOn, envForced }
+}
+
+/** Free-trial end for "switch on with N free days": null when there is no trial (0 days). */
+export function trialEnd(now: number, days: number): string | null {
+  return days > 0 ? new Date(now + days * 86_400_000).toISOString() : null
+}
+
+export const cleanTrialDays = (v: unknown): number | null => {
+  const n = Number(v)
+  return Number.isInteger(n) && n >= 0 && n <= 365 ? n : null
+}

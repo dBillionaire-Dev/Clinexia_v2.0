@@ -49,3 +49,19 @@ export function validateOrganisation(input: unknown): Result<OrganisationInput> 
   const country = a.country === undefined || a.country === "" ? undefined : text(a.country, 2, 60) ?? undefined
   return { ok: true, value: { name, orgType, contactPhone, country } }
 }
+
+export interface ProfileUpdate { fullName: string; background?: string; role?: string }
+
+/** "Your details" on the account page. Organisation administrators have only a name; individuals also say whether they work in healthcare and their role. */
+export function validateProfileUpdate(input: unknown, accountType: "individual" | "enterprise"): Result<ProfileUpdate> {
+  if (!input || typeof input !== "object") return { ok: false, error: "No details received." }
+  const a = input as Record<string, unknown>
+  const fullName = text(a.fullName, 2, 100)
+  if (!fullName) return { ok: false, error: "Enter your name (2 to 100 characters)." }
+  if (accountType !== "individual") return { ok: true, value: { fullName } }
+  const background = BACKGROUND.find((b) => b.value === a.background)?.value
+  if (!background) return { ok: false, error: "Say whether you work in healthcare." }
+  const role = rolesFor(background).find((r) => r.value === a.role)?.value
+  if (!role) return { ok: false, error: "Choose what describes you best." }
+  return { ok: true, value: { fullName, background, role } }
+}

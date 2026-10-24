@@ -23,5 +23,20 @@ export function validatePush(raw: unknown): Cleaned<PushInput> {
   return { ok: true, value: { title, body, url, audience } }
 }
 
+export const MESSAGE_LIMITS = { title: 65, body: 500 }
+export interface UserMessageInput { title: string; body: string }
+
+/** A private message from the admin to one person (in the app, on their phone and by email). */
+export function validateUserMessage(raw: unknown): Cleaned<UserMessageInput> {
+  if (!raw || typeof raw !== "object") return { ok: false, error: "No details received." }
+  const r = raw as Record<string, unknown>
+  const title = clean(r.title, MESSAGE_LIMITS.title)
+  // The message keeps its line breaks (the in-app card and the email show them); everything else is cleaned like a notification.
+  const body = typeof r.body === "string" ? r.body.replace(/\r\n?/g, "\n").replace(/[\u0000-\u0009\u000B-\u001F\u007F]/g, " ").replace(/\n{3,}/g, "\n\n").trim().slice(0, MESSAGE_LIMITS.body) : ""
+  if (!title) return { ok: false, error: "Write the message's title." }
+  if (!body) return { ok: false, error: "Write the message." }
+  return { ok: true, value: { title, body } }
+}
+
 /** A device token from the phone: letters, digits and a few separators, never anything that could be a command. */
 export const validPushToken = (t: unknown): t is string => typeof t === "string" && t.length >= 20 && t.length <= 4096 && /^[A-Za-z0-9:_\-.]+$/.test(t)

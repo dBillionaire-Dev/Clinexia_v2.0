@@ -11,6 +11,7 @@ import { ORGANISATION_TYPES, SPECIALTY_LABELS, type Specialty } from "@/lib/bill
 import { AuthForm } from "./auth-form"
 import { notifySessionChanged } from "@/lib/billing/use-account-session"
 import { PlanPicker } from "./plan-picker"
+import { InboxNotice } from "./inbox-notice"
 
 type Me = {
   user: { id: string; email: string }
@@ -18,6 +19,8 @@ type Me = {
   entitlements: { all: boolean; specialties: Specialty[] }
   subscription: { plan: string; specialties: Specialty[]; status: string; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean } | null
   organisations: Array<{ orgId: string; role: string; name: string }>
+  payments?: boolean
+  trialEndsAt?: string | null
 }
 
 const field = "w-full rounded-md border bg-background px-3 py-2 text-sm"
@@ -68,10 +71,13 @@ export function AccountApp() {
         <Button variant="outline" onClick={async () => { await api("/api/account/logout", {}); setMe(null); notifySessionChanged() }}>Sign out</Button>
       </header>
 
+      <InboxNotice />
+
       <section className="rounded-lg border p-4 space-y-2">
         <h2 className="font-medium">What you can use</h2>
         <p className="text-sm text-muted-foreground">Free calculators and tools are always available.</p>
         <p className="text-sm">{me.entitlements.all ? "All premium specialties." : me.entitlements.specialties.length ? me.entitlements.specialties.map((s) => SPECIALTY_LABELS[s]).join(", ") : "No premium specialties yet."}</p>
+        {me.trialEndsAt && <p className="text-sm font-medium">Free trial: full access until {new Date(me.trialEndsAt).toLocaleDateString()}.</p>}
         {sub && <p className="text-xs text-muted-foreground">Your plan: {sub.plan === "all_access" ? "all-access" : sub.specialties.map((s) => SPECIALTY_LABELS[s]).join(", ")} · {sub.status}{sub.currentPeriodEnd ? ` · paid until ${new Date(sub.currentPeriodEnd).toLocaleDateString()}` : ""}{sub.cancelAtPeriodEnd ? " · will not continue" : ""}</p>}
         {sub && (sub.status === "active" || sub.status === "grace") && !sub.cancelAtPeriodEnd && (
           <button className="text-xs underline" onClick={async () => { if (await confirmDialog({ title: "Stop your plan?", description: "You keep access until the end of the month you have paid for. It will not renew.", confirmLabel: "Stop plan", destructive: true })) { await api("/api/billing/cancel", {}); void load() } }}>Cancel at the end of the paid period</button>
@@ -92,10 +98,12 @@ export function AccountApp() {
         </section>
       )}
 
-      <section className="space-y-3">
-        <h2 className="font-medium">{sub ? "Change or renew your plan" : "Choose a plan"}</h2>
-        <PlanPicker kind="individual" />
-      </section>
+      {me.payments && (
+        <section className="space-y-3">
+          <h2 className="font-medium">{sub ? "Change or renew your plan" : "Choose a plan"}</h2>
+          <PlanPicker kind="individual" />
+        </section>
+      )}
 
       <section className="space-y-3">
         <h2 className="font-medium">Set up an organisation</h2>

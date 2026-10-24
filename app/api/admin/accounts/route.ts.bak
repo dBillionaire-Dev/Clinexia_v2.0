@@ -3,11 +3,12 @@ import { isAdminAuthenticated } from "@/lib/admin-auth"
 import { billingEnabled } from "@/lib/billing/config"
 import { cleanReason, confirmationMatches, suspendedMessage } from "@/lib/billing/admin-rules"
 import { getAuthUser } from "@/lib/billing/admin-users"
-import { linkDevice, unlinkDevice } from "@/lib/billing/devices"
+import { backfillDeviceLinks, linkDevice, unlinkDevice } from "@/lib/billing/devices"
 import { isDeviceId } from "@/lib/billing/history"
 import { cleanSpecialties } from "@/lib/billing/pricing"
 import { SPECIALTY_LABELS } from "@/lib/billing/config"
 import { isUuid } from "@/lib/billing/db"
+import { errorText, explainSetupError } from "@/lib/billing/setup-hints"
 import { composeNotice, sendEmail, type NoticeKind } from "@/lib/billing/notify"
 import {
   deleteOrganisationCompletely, deleteUserCompletely, getOrgOwner, loadAdminUserDetail, loadAdminUsers, recordAudit, setOrgMarket, setSuspended, setUserMarket, setUserPlan, setUserStatus,
@@ -40,10 +41,20 @@ export async function GET(request: Request) {
   const userId = url.searchParams.get("userId")
   if (userId) {
     if (!isUuid(userId)) return out({ error: "Invalid user." }, 400)
-    const detail = await loadAdminUserDetail(userId)
-    return detail ? out(detail) : out({ error: "User not found." }, 404)
+    try {
+      const detail = await loadAdminUserDetail(userId)
+      return detail ? out(detail) : out({ error: "User not found." }, 404)
+    } catch (error) {
+      return out({ error: explainSetupError(errorText(error)) ?? `Could not load this person: ${errorText(error).slice(0, 200)}` }, 500)
+    }
   }
-  return out(await loadAdminUsers(url.searchParams.get("q") ?? ""))
+  try {
+    return out(await loadAdminUsers(url.searchParams.get("q") ?? ""))
+  } catch (error) {
+    const message = errorText(error)
+    console.error("Clinexia admin users failed:", message)
+    return out({ error: explainSetupError(message) ?? `Could not load users: ${message.slice(0, 200)}` }, 500)
+  }
 }
 
 export async function POST(request: Request) {
@@ -108,6 +119,15 @@ export async function POST(request: Request) {
       const email = await notify(user.email, "plan_changed", { name: label })
       await recordAudit({ actorKind: "platform_admin", actorUserId: userId, action: "user.plan_set", detail: { plan, specialties, months, periodEnd, email } })
       return out({ ok: true, email, label })
+    }
+    case "backfillLinks": {
+      try {
+        const r = await backfillDeviceLinks()
+        await recordAudit({ actorKind: "platform_admin", action: "devices.backfilled", detail: r })
+        return out({ ok: true, ...r })
+      } catch (error) {
+        return out({ error: explainSetupError(errorText(error)) ?? "Could not link devices. Has supabase/billing-link.sql been run?" }, 500)
+      }
     }
     case "linkDevice":
     case "unlinkDevice": {

@@ -37,6 +37,20 @@ export async function getAuthUser(id: string): Promise<AuthUser | null> {
   return shape(await res.json())
 }
 
+/**
+ * A one-time password-reset token for this email, made by Supabase WITHOUT sending Supabase's own email, so Clinexia can send the
+ * message itself (through Resend). Null when there is no such account. The token is later traded in with verifyRecovery().
+ */
+export async function generateRecoveryToken(email: string): Promise<{ userId: string; tokenHash: string } | null> {
+  const { base, headers } = conn()
+  const res = await fetch(`${base}/generate_link`, { method: "POST", headers, body: JSON.stringify({ type: "recovery", email }), cache: "no-store" })
+  if (!res.ok) return null // unknown address (or Supabase refused): the caller answers the same either way
+  const j = (await res.json().catch(() => null)) as any
+  const tokenHash = j?.hashed_token ?? j?.properties?.hashed_token
+  const userId = j?.id ?? j?.user?.id
+  return typeof tokenHash === "string" && typeof userId === "string" ? { userId, tokenHash } : null
+}
+
 export async function deleteAuthUser(id: string): Promise<void> {
   const { base, headers } = conn()
   const res = await fetch(`${base}/users/${uuid(id)}`, { method: "DELETE", headers })

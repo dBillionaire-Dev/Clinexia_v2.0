@@ -5,6 +5,8 @@ import { addMonthsUtc } from "@/lib/billing/lifecycle"
 import { cleanSpecialties } from "@/lib/billing/pricing"
 import { getPricing, grantOrganisationSubscription, listAuditEvents, listOrganisationsForAdmin, recordAudit, savePricingConfig, setManagedStatus, setSuspended } from "@/lib/billing/store"
 import { isUuid } from "@/lib/billing/db"
+import { cleanNewUserDays, cleanTrialDays, resolveLaunch, trialEnd } from "@/lib/billing/launch"
+import { getLaunch, saveLaunch } from "@/lib/billing/launch-store"
 
 export const dynamic = "force-dynamic"
 
@@ -14,8 +16,8 @@ const out = (data: unknown, status = 200) => NextResponse.json(data, { status, h
 export async function GET() {
   if (!billingEnabled()) return new NextResponse(null, { status: 404 })
   if (!(await isAdminAuthenticated())) return new NextResponse("Unauthorized", { status: 401 })
-  const [pricing, organisations, audit] = await Promise.all([getPricing(), listOrganisationsForAdmin(), listAuditEvents(undefined, 100)])
-  return out({ pricing, organisations, audit })
+  const [pricing, organisations, audit, launch] = await Promise.all([getPricing(), listOrganisationsForAdmin(), listAuditEvents(undefined, 100), getLaunch()])
+  return out({ pricing, organisations, audit, launch: resolveLaunch(launch, process.env, Date.now()) })
 }
 
 export async function POST(request: Request) {
@@ -38,6 +40,20 @@ export async function POST(request: Request) {
       const saved = await savePricingConfig(body.config)
       await recordAudit({ actorKind: "platform_admin", action: "pricing.updated", detail: { managedDiscountBps: saved.managedDiscountBps } })
       return out({ pricing: saved })
+    }
+    case "setLaunch": {
+      // The "Switch on billing" button. enforce=false switches locking off; trialDays > 0 gives everyone full access for that long first.
+      const trialDays = cleanTrialDays(body.trialDays)
+      const newUserDays = body.newUserTrialDays === undefined ? 7 : cleanNewUserDays(body.newUserTrialDays)
+      if (typeof body.enforce !== "boolean" || trialDays === null || newUserDays === null) return out({ error: "Choose on or off, 0 to 365 free days for everyone, and 0 to 60 free days for new users." }, 400)
+      const now = Date.now()
+      const before = await getLaunch(now)
+      // "New users" are people who join after payments were introduced; changing the free periods later does not move that date.
+      const introducedAt = body.enforce ? (before.enforce && before.introducedAt ? before.introducedAt : new Date(now).toISOString()) : null
+      const state = { enforce: body.enforce, freeUntil: body.enforce ? trialEnd(now, trialDays) : null, introducedAt, newUserTrialDays: newUserDays }
+      await saveLaunch(state)
+      await recordAudit({ actorKind: "platform_admin", action: state.enforce ? "billing.switched_on" : "billing.switched_off", detail: { trialDays: state.enforce ? trialDays : 0, freeUntil: state.freeUntil, newUserTrialDays: newUserDays } })
+      return out({ launch: resolveLaunch(state, process.env, now) })
     }
     case "verifyManaged":
     case "rejectManaged": {

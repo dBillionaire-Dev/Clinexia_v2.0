@@ -1,0 +1,32 @@
+// Reads and saves the launch state (billing_launch, one row). Kept 15 seconds in memory because every calculator page asks.
+// If the database cannot be read, the last known state is used, and with none yet the environment setting alone decides,
+// so a missing table or a brief outage never locks or unlocks anything by surprise.
+import { db } from "./db"
+import { NO_LAUNCH, resolveLaunch, type LaunchState, type LaunchStatus } from "./launch"
+
+let cache: { at: number; state: LaunchState } | null = null
+
+export async function getLaunch(now = Date.now()): Promise<LaunchState> {
+  if (cache && now - cache.at < 15_000) return cache.state
+  try {
+    const [row] = await db.select("billing_launch", "select=enforce,free_until&id=eq.1")
+    const state: LaunchState = row ? { enforce: row.enforce === true, freeUntil: row.free_until ?? null } : NO_LAUNCH
+    cache = { at: now, state }
+    return state
+  } catch {
+    return cache?.state ?? NO_LAUNCH
+  }
+}
+
+export async function saveLaunch(state: LaunchState): Promise<LaunchState> {
+  const stamp = new Date().toISOString()
+  const row = { enforce: state.enforce, free_until: state.freeUntil, updated_at: stamp }
+  const changed = await db.update("billing_launch", "id=eq.1", row)
+  if (changed.length === 0) await db.insert("billing_launch", { id: 1, ...row })
+  cache = { at: Date.now(), state }
+  return state
+}
+
+export async function getLaunchStatus(now = Date.now()): Promise<LaunchStatus> {
+  return resolveLaunch(await getLaunch(now), process.env, now)
+}

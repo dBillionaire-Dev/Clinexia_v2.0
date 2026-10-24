@@ -26,7 +26,7 @@ const manages = (actor: Dash["role"], target: Member["role"]) => target !== "own
 export function OrganisationDashboard({ orgId }: { orgId: string }) {
   const [d, setD] = useState<Dash | null | undefined>(undefined)
   const [error, setError] = useState("")
-  const [links, setLinks] = useState<Array<{ email: string; link: string }>>([])
+  const [links, setLinks] = useState<Array<{ email: string; link: string; emailed?: boolean }>>([])
   const [skipped, setSkipped] = useState<Array<{ email: string; reason: string }>>([])
   const [invite, setInvite] = useState({ emails: "", role: "staff", all: true, specialties: [] as Specialty[] })
   const [busy, setBusy] = useState(false)
@@ -130,8 +130,10 @@ export function OrganisationDashboard({ orgId }: { orgId: string }) {
           )}
           {links.length > 0 && (
             <div className="rounded-lg border p-3 text-sm space-y-2">
-              <p className="font-medium">Share these private links (shown once; each works only for the invited email):</p>
-              {links.map((l) => <div key={l.email}><span className="text-muted-foreground">{l.email}</span><input readOnly className="mt-1 w-full rounded-md border bg-background px-2 py-1 text-xs" value={l.link} onFocus={(e) => e.currentTarget.select()} /></div>)}
+              {links.some((l) => l.emailed) && <p className="font-medium">Invitation emailed to: {links.filter((l) => l.emailed).map((l) => l.email).join(", ")}</p>}
+              {links.some((l) => !l.emailed) && <p className="font-medium">We could not email these people. Share their private links yourself (shown once; each works only for the invited email):</p>}
+              {links.filter((l) => !l.emailed).map((l) => <div key={l.email}><span className="text-muted-foreground">{l.email}</span><input readOnly className="mt-1 w-full rounded-md border bg-background px-2 py-1 text-xs" value={l.link} onFocus={(e) => e.currentTarget.select()} /></div>)}
+              {links.some((l) => l.emailed) && <details><summary className="cursor-pointer text-xs text-muted-foreground">Backup links for the emailed invitations</summary>{links.filter((l) => l.emailed).map((l) => <div key={l.email} className="mt-2"><span className="text-muted-foreground">{l.email}</span><input readOnly className="mt-1 w-full rounded-md border bg-background px-2 py-1 text-xs" value={l.link} onFocus={(e) => e.currentTarget.select()} /></div>)}</details>}
             </div>
           )}
           {skipped.length > 0 && <ul className="text-sm text-muted-foreground">{skipped.map((s) => <li key={s.email}>{s.email}: {s.reason}</li>)}</ul>}

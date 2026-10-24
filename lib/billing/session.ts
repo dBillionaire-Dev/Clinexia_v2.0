@@ -1,12 +1,13 @@
 // Account sign-in through Supabase Auth (GoTrue) over plain fetch, so no new library is needed. The anon key is used only
 // on the server; the browser only ever holds two httpOnly cookies. Needs SUPABASE_URL and SUPABASE_ANON_KEY (new).
 import { cookies, headers } from "next/headers"
+import { avatarFromMetadata, type AvatarSource } from "./avatar"
 import { getUserStatus } from "./store"
 
 const ACCESS = "clinexia-access"
 const REFRESH = "clinexia-refresh"
 
-export interface AccountUser { id: string; email: string }
+export interface AccountUser { id: string; email: string; avatarUrl?: string; avatarSource?: AvatarSource }
 export interface Session { access_token: string; refresh_token: string; expires_in?: number }
 
 function cfg() {
@@ -51,6 +52,47 @@ export async function resendConfirmation(email: string, redirectTo?: string): Pr
   await call(redirectTo ? `resend?redirect_to=${encodeURIComponent(redirectTo)}` : "resend", { body: { type: "signup", email } })
 }
 
+export type ResetFailure = "invalid" | "same" | "weak" | "error"
+
+/**
+ * Finishes a password reset: trades the one-time token for a short session, sets the new password with it, then signs that session
+ * and every other session of the account out (a reset usually means someone else may have had access).
+ */
+export async function completePasswordReset(tokenHash: string, password: string): Promise<{ ok: true; email: string } | { ok: false; reason: ResetFailure }> {
+  const v = await call("verify", { body: { type: "recovery", token_hash: tokenHash } })
+  if (!v.ok || typeof v.json?.access_token !== "string") return { ok: false, reason: v.status >= 500 ? "error" : "invalid" }
+  const token = v.json.access_token as string
+  const email = typeof v.json?.user?.email === "string" ? (v.json.user.email as string) : ""
+  const put = await call("user", { method: "PUT", token, body: { password } })
+  if (!put.ok) {
+    const code = String(put.json?.error_code ?? put.json?.code ?? "")
+    await call("logout", { token, body: {} }).catch(() => undefined)
+    return { ok: false, reason: code === "same_password" ? "same" : code === "weak_password" ? "weak" : "error" }
+  }
+  await call("logout?scope=global", { token, body: {} }).catch(() => undefined)
+  return { ok: true, email }
+}
+
+export type PasswordChange = { ok: true } | { ok: false; reason: "wrong" | "same" | "weak" | "error" }
+
+/**
+ * Changes the password of a signed-in person. The current password is checked first (a stolen session alone cannot change it), the
+ * new one is set, and every session of the account is ended, including this one: the person signs in again with the new password.
+ */
+export async function changePassword(email: string, current: string, next: string): Promise<PasswordChange> {
+  const s = await signInUser(email, current)
+  if ("error" in s) return { ok: false, reason: "wrong" }
+  const token = s.session.access_token
+  const put = await call("user", { method: "PUT", token, body: { password: next } })
+  if (!put.ok) {
+    const code = String(put.json?.error_code ?? put.json?.code ?? "")
+    await call("logout", { token, body: {} }).catch(() => undefined)
+    return { ok: false, reason: code === "same_password" ? "same" : code === "weak_password" ? "weak" : "error" }
+  }
+  await call("logout?scope=global", { token, body: {} }).catch(() => undefined)
+  return { ok: true }
+}
+
 export async function refreshSession(refreshToken: string): Promise<Session | null> {
   const r = await call("token?grant_type=refresh_token", { body: { refresh_token: refreshToken } })
   return r.ok && r.json?.access_token ? (r.json as Session) : null
@@ -58,7 +100,9 @@ export async function refreshSession(refreshToken: string): Promise<Session | nu
 
 export async function userFromAccessToken(token: string): Promise<AccountUser | null> {
   const r = await call("user", { method: "GET", token })
-  return r.ok && typeof r.json?.id === "string" && typeof r.json?.email === "string" ? { id: r.json.id, email: r.json.email } : null
+  if (!(r.ok && typeof r.json?.id === "string" && typeof r.json?.email === "string")) return null
+  const photo = avatarFromMetadata(r.json.user_metadata)
+  return { id: r.json.id, email: r.json.email, ...(photo ? { avatarUrl: photo.url, avatarSource: photo.source } : {}) }
 }
 
 const secure = () => process.env.NODE_ENV === "production"

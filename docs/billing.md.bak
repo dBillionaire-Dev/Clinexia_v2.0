@@ -28,6 +28,10 @@
 - Deleting a person removes their sign-in account, profile, memberships and subscription. You must type their email to confirm.
   Payment records are kept with their links cleared. Someone who owns an organisation cannot be deleted until it is deleted or reassigned.
 - Deleting an organisation removes its members' membership, invitations and subscription; you must type its name to confirm.
+- Payments are shown or hidden from Admin > Pricing > "Payments for users" (run `supabase/billing-launch.sql` once). Hidden = no prices, plans or checkout, nothing locked. "Show payments" introduces them to new and existing users: everyone keeps full access for the chosen free period (default 30 days), then locks start by themselves; anyone who joins after payments were introduced also gets their own free days from signup (default 7). "Hide payments" makes everything free again; paid plans are kept.
+- Admin > Users > open a user > "Send a private message" (run `supabase/user-messages.sql` once): the message appears in that person's app (and on their account page), is sent to their phones when notifications are set up, and is emailed through Resend. Nobody else can see it.
+- Forgot password: "Forgot password?" on the sign-in screen (website and app) emails a reset link through Resend (needs `RESEND_API_KEY`, `BILLING_FROM_EMAIL` and `SUPABASE_SERVICE_ROLE_KEY`). The link opens `/account/reset` on the website, works once, and changing the password signs the account out everywhere and emails a "password changed" notice. The page always answers the same whether or not the email has an account. No Supabase redirect setting is needed.
+- Invitations, payment receipts and plan-ending reminders are emailed automatically through Resend (run `supabase/email-notifications.sql` once; reminders need `CRON_SECRET`, the job runs daily from `vercel.json`). Each email is sent once. If an invitation email fails, the inviter still gets the private link on screen.
 - Notices are emailed only when `RESEND_API_KEY` and `BILLING_FROM_EMAIL` are set. Deletion notices are sent before deleting.
 - Every action is written to the audit trail.
 

@@ -5,6 +5,7 @@ import Link from "next/link"
 import { ClipboardList, LogIn, User, UserPlus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { UserAvatar } from "./user-avatar"
 import { writeSessionState } from "@/lib/billing/guest"
 import { useAccountSession } from "@/lib/billing/use-account-session"
 import { ARRIVED_EVENT, OPEN_EVENT, usePendingCampaigns } from "@/lib/campaigns/use-pending"
@@ -47,7 +48,7 @@ export function AccountMenu() {
           aria-label={`${s.signedIn ? "Your account" : "Sign in or create an account"}${count ? `, ${count} thing${count === 1 ? "" : "s"} waiting for you` : ""}`}
           className={`relative shrink-0 ${pulse ? "scale-110 transition-transform" : "transition-transform"}`}
         >
-          {s.signedIn && initial ? <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">{initial}</span> : <User className="h-5 w-5" />}
+          {s.signedIn && initial ? <UserAvatar url={s.avatarUrl} initial={initial} size={28} /> : <User className="h-5 w-5" />}
           {count > 0 && (
             <span aria-hidden className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center">
               {pulse && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-destructive/60" />}

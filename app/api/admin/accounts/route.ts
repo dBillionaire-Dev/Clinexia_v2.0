@@ -10,6 +10,9 @@ import { SPECIALTY_LABELS } from "@/lib/billing/config"
 import { isUuid } from "@/lib/billing/db"
 import { errorText, explainSetupError } from "@/lib/billing/setup-hints"
 import { composeNotice, sendEmail, type NoticeKind } from "@/lib/billing/notify"
+import { sendAdminMessage } from "@/lib/billing/admin-message"
+import { publicBaseUrl } from "@/lib/billing/email-flows"
+import { validateUserMessage } from "@/lib/push/validate"
 import {
   deleteOrganisationCompletely, deleteUserCompletely, getOrgOwner, loadAdminUserDetail, loadAdminUsers, recordAudit, setOrgMarket, setSuspended, setUserMarket, setUserPlan, setUserStatus,
 } from "@/lib/billing/store"
@@ -139,6 +142,16 @@ export async function POST(request: Request) {
       if (!ok) return out({ error: link ? "Could not link that device. Has supabase/billing-link.sql been run?" : "That device was not linked to this account." }, link ? 500 : 404)
       await recordAudit({ actorKind: "platform_admin", actorUserId: userId, action: link ? "device.linked" : "device.unlinked", detail: { anonymousId: body.anonymousId } })
       return out({ ok: true })
+    }
+    case "sendMessage": {
+      // A private message to one person: appears in their app and account page, goes to their phones, and to their email.
+      if (!isUuid(userId)) return out({ error: "Invalid user." }, 400)
+      const checked = validateUserMessage(body)
+      if (!checked.ok) return out({ error: checked.error }, 400)
+      const result = await sendAdminMessage({ userId, title: checked.value.title, body: checked.value.body, baseUrl: publicBaseUrl(new URL(request.url).origin) })
+      if (!result) return out({ error: "User not found." }, 404)
+      await recordAudit({ actorKind: "platform_admin", actorUserId: userId, action: "user.message_sent", detail: { title: checked.value.title, push: result.push, phones: result.phones, email: result.email } })
+      return out({ ok: true, ...result })
     }
     case "setUserMarket": {
       if (!isUuid(userId) || (body.market !== "ng" && body.market !== "intl")) return out({ error: "Invalid request." }, 400)

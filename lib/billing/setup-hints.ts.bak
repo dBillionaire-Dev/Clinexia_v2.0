@@ -17,6 +17,9 @@ const MISSING = /pgrst20[245]|42p01|42703|does not exist|could not find (the )?(
 // Which SQL file creates what (most specific first).
 const FILE_FOR: Array<[RegExp, string]> = [
   [/billing_device_links|billing_link_device|billing_backfill|billing_forget/i, "supabase/billing-link.sql"],
+  [/push_messages_audience_check|push_messages\.user_id|user_id.*push_messages/i, "supabase/user-messages.sql"],
+  [/billing_launch|introduced_at|new_user_trial_days/i, "supabase/billing-launch.sql"],
+  [/emailed_at|receipt_sent_at|reminder_sent_for/i, "supabase/email-notifications.sql"],
   [/billing_user_status|\bmarket\b|\bsource\b/i, "supabase/billing-admin.sql"],
   [/app_campaign|platforms/i, "supabase/campaigns.sql"],
   [/push_devices|push_messages/i, "supabase/push.sql"],

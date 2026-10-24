@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { PasswordInput } from "./password-input"
+import { ForgotPassword } from "./password-reset"
 import { getAnonymousId } from "@/lib/analytics/client-id"
 import { api } from "@/lib/billing/client"
 import { BACKGROUND, rolesFor } from "@/lib/feedback/questions"
@@ -18,6 +19,7 @@ export function AuthForm({ onDone, initialMode = "signup", onNeedsConfirmation }
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
   const [notice, setNotice] = useState("")
+  const [forgot, setForgot] = useState(false)
   const set = (k: keyof typeof f, v: string) => setF((cur) => ({ ...cur, [k]: v, ...(k === "background" ? { role: "" } : {}) }))
 
   async function submit(e: React.FormEvent) {
@@ -32,6 +34,8 @@ export function AuthForm({ onDone, initialMode = "signup", onNeedsConfirmation }
     }
     onDone()
   }
+
+  if (forgot) return <ForgotPassword initialEmail={f.email} onBack={() => setForgot(false)} />
 
   if (!type && mode === "signup") {
     return (
@@ -71,6 +75,7 @@ export function AuthForm({ onDone, initialMode = "signup", onNeedsConfirmation }
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" disabled={busy}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : mode === "login" ? "Sign in" : "Create account"}</Button>
         <button type="button" className="text-sm underline" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError("") }}>{mode === "login" ? "Create an account" : "I already have an account"}</button>
+        {mode === "login" && <button type="button" className="text-sm underline" onClick={() => { setForgot(true); setError("") }}>Forgot password?</button>}
         {mode === "signup" && <button type="button" className="text-sm underline" onClick={() => setType(null)}>Back</button>}
       </div>
     </form>

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { api } from "@/lib/billing/client"
 import { SPECIALTIES, SPECIALTY_LABELS, type Specialty } from "@/lib/billing/config"
 import { formatMoney, type Quote } from "@/lib/billing/pricing"
+import { useAccountSession } from "@/lib/billing/use-account-session"
 
 type Plan = "specialty" | "all_access"
 
@@ -17,6 +18,7 @@ export function PlanPicker({ kind, orgId, minSeats = 1, onFree }: { kind: "indiv
   const [quote, setQuote] = useState<Quote | null>(null)
   const [error, setError] = useState("")
   const [paying, setPaying] = useState(false)
+  const session = useAccountSession()
 
   useEffect(() => {
     if (plan === "specialty" && specialties.length === 0) {
@@ -42,6 +44,8 @@ export function PlanPicker({ kind, orgId, minSeats = 1, onFree }: { kind: "indiv
     if (r.ok) window.location.href = r.data.authorizationUrl
     else { setError(r.error); setPaying(false) }
   }
+
+  if (!session.payments) return null // payments are hidden until the administrator introduces them
 
   return (
     <div className="space-y-5">

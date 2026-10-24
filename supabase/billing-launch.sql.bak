@@ -1,0 +1,10 @@
+-- Admin "Switch on billing" button and the free-trial period. Run once in the Supabase SQL editor; safe to re-run.
+-- One row. enforce = premium calculators are locked for people without a plan. free_until = everyone has full access until then.
+create table if not exists public.billing_launch (
+  id integer primary key default 1 check (id = 1),
+  enforce boolean not null default false,
+  free_until timestamptz,
+  updated_at timestamptz not null default now()
+);
+insert into public.billing_launch (id) values (1) on conflict (id) do nothing;
+alter table public.billing_launch enable row level security;

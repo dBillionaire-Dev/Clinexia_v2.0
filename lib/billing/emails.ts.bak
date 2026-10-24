@@ -1,0 +1,189 @@
+// The three automatic emails: organisation invitation, payment receipt, and "your plan is ending". Everything here is pure
+// (text in, text out) so it is tested without sending anything. Each email has an HTML and a plain-text version.
+// Anything a person typed (organisation name, their own name) is HTML-escaped before it goes into the HTML version.
+import { SPECIALTY_LABELS } from "./config"
+import { formatMoney } from "./pricing"
+
+export interface ComposedEmail { subject: string; text: string; html: string }
+
+const BRAND = "#073a68"
+const DAY = 86_400_000
+
+export const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;")
+
+/** "1 November 2026", always in UTC so the same date shows on the server, in tests and in the email. */
+export const formatDate = (when: string | number) => new Date(when).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })
+
+const safeUrl = (u: string) => (/^https?:\/\//i.test(u) ? u : "#")
+
+export function planLabel(plan: string, specialties: string[]): string {
+  if (plan === "all_access") return "All-access"
+  const names = specialties.map((s) => (SPECIALTY_LABELS as Record<string, string>)[s] ?? s)
+  return names.length ? `Specialty premium (${names.join(", ")})` : "Specialty premium"
+}
+
+function shell(heading: string, bodyHtml: string): string {
+  return `<!doctype html><html><body style="margin:0;padding:0;background:#f3f5f8;font-family:Arial,Helvetica,sans-serif;color:#1c2733">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f5f8;padding:24px 12px"><tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:10px;overflow:hidden">
+<tr><td style="background:${BRAND};padding:18px 24px;color:#ffffff;font-size:18px;font-weight:bold">Clinexia</td></tr>
+<tr><td style="padding:24px;font-size:15px;line-height:1.55">
+<h1 style="margin:0 0 14px;font-size:20px;color:${BRAND}">${escapeHtml(heading)}</h1>
+${bodyHtml}
+<p style="margin:24px 0 0;color:#5b6773;font-size:13px">The Clinexia team</p>
+</td></tr></table>
+<p style="max-width:520px;margin:12px 0 0;color:#8a949e;font-size:12px">You are receiving this email because of activity on your Clinexia account.</p>
+</td></tr></table></body></html>`
+}
+
+const para = (s: string) => `<p style="margin:0 0 12px">${s}</p>`
+const button = (label: string, url: string) =>
+  `<p style="margin:18px 0"><a href="${escapeHtml(safeUrl(url))}" style="display:inline-block;background:${BRAND};color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 20px;border-radius:8px">${escapeHtml(label)}</a></p>`
+const small = (s: string) => `<p style="margin:0 0 10px;color:#5b6773;font-size:13px">${s}</p>`
+const linkFallback = (url: string) => small(`If the button does not work, copy this address into your browser:<br><span style="word-break:break-all">${escapeHtml(url)}</span>`)
+
+// ---------------------------------------------------------------------------------------------------------------------
+// 1. Organisation invitation
+// ---------------------------------------------------------------------------------------------------------------------
+export function composeInvitationEmail(input: { orgName: string; inviterName: string; role: "admin" | "staff"; link: string; expiresAt: string; inviteeEmail: string }): ComposedEmail {
+  const org = input.orgName.trim() || "an organisation"
+  const who = input.inviterName.trim() || "An administrator"
+  const role = input.role === "admin" ? "an administrator" : "a member of staff"
+  const expires = formatDate(input.expiresAt)
+  const subject = `${who} invited you to join ${org} on Clinexia`
+  const text = [
+    `${who} has invited you to join ${org} on Clinexia as ${role}.`,
+    "",
+    "Open this private link to accept:",
+    input.link,
+    "",
+    `Sign in, or create an account, with ${input.inviteeEmail}. The link works only for that email address and expires on ${expires}.`,
+    "",
+    "If you were not expecting this invitation, you can ignore this email. Nothing happens unless you accept.",
+    "",
+    "The Clinexia team",
+  ].join("\n")
+  const html = shell(
+    `You are invited to ${org}`,
+    para(`<strong>${escapeHtml(who)}</strong> has invited you to join <strong>${escapeHtml(org)}</strong> on Clinexia as ${role}.`) +
+      button("Accept invitation", input.link) +
+      small(`Sign in, or create an account, with <strong>${escapeHtml(input.inviteeEmail)}</strong>. The link works only for that email address and expires on ${escapeHtml(expires)}.`) +
+      small("If you were not expecting this invitation, you can ignore this email. Nothing happens unless you accept.") +
+      linkFallback(input.link),
+  )
+  return { subject, text, html }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// 2. Payment receipt
+// ---------------------------------------------------------------------------------------------------------------------
+export interface ReceiptInput {
+  name: string
+  reference: string
+  amountMinor: number
+  currency: "NGN" | "USD"
+  paidAt: string
+  plan: string
+  specialties: string[]
+  seats: number
+  /** Set for an organisation plan. */
+  orgName?: string
+  /** When the plan now runs until (null if unknown). */
+  periodEnd: string | null
+  url: string
+}
+
+export function composeReceiptEmail(r: ReceiptInput): ComposedEmail {
+  const amount = formatMoney(r.amountMinor, r.currency)
+  const rows: Array<[string, string]> = [
+    ["Amount paid", amount],
+    ["Date", formatDate(r.paidAt)],
+    ["Plan", planLabel(r.plan, r.specialties)],
+  ]
+  if (r.orgName) rows.push(["Organisation", r.orgName], ["Seats", String(r.seats)])
+  if (r.periodEnd) rows.push(["Active until", formatDate(r.periodEnd)])
+  rows.push(["Reference", r.reference])
+
+  const hello = r.name.trim() ? `Hello ${r.name.trim()},` : "Hello,"
+  const closing = r.periodEnd
+    ? `Plans do not renew automatically. We will email you a few days before ${formatDate(r.periodEnd)} so you can renew in time.`
+    : "Plans do not renew automatically."
+  const subject = `Your Clinexia receipt: ${amount}`
+  const text = [hello, "", "Thank you. We received your payment.", "", ...rows.map(([k, v]) => `${k}: ${v}`), "", closing, "", `Your account: ${r.url}`, "", "The Clinexia team"].join("\n")
+  const table = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:14px 0;border-top:1px solid #e3e8ee">${rows
+    .map(([k, v]) => `<tr><td style="padding:9px 0;border-bottom:1px solid #e3e8ee;color:#5b6773;width:38%">${escapeHtml(k)}</td><td style="padding:9px 0;border-bottom:1px solid #e3e8ee;font-weight:bold;word-break:break-all">${escapeHtml(v)}</td></tr>`)
+    .join("")}</table>`
+  const html = shell(
+    "Payment received",
+    para(escapeHtml(hello)) + para("Thank you. We received your payment.") + table + small(escapeHtml(closing)) + button("Open your account", r.url),
+  )
+  return { subject, text, html }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// 3. Plan ending soon
+// ---------------------------------------------------------------------------------------------------------------------
+export interface ReminderInput {
+  name: string
+  plan: string
+  specialties: string[]
+  seats: number
+  orgName?: string
+  periodEnd: string
+  /** The person already chose to stop the plan: it will not renew, so say that instead of asking them to renew. */
+  cancelled: boolean
+  graceDays: number
+  now: number
+  url: string
+}
+
+export const daysUntil = (iso: string, now: number) => Math.max(0, Math.ceil((Date.parse(iso) - now) / DAY))
+
+export function composeReminderEmail(r: ReminderInput): ComposedEmail {
+  const date = formatDate(r.periodEnd)
+  const days = daysUntil(r.periodEnd, r.now)
+  const inDays = days <= 1 ? "tomorrow" : `in ${days} days`
+  const what = r.orgName ? `The Clinexia plan for ${r.orgName}` : "Your Clinexia plan"
+  const label = planLabel(r.plan, r.specialties)
+  const who = r.orgName ? `all ${r.seats} seat${r.seats === 1 ? "" : "s"} in the organisation lose` : "you lose"
+  const hello = r.name.trim() ? `Hello ${r.name.trim()},` : "Hello,"
+
+  const lines: string[] = [hello, ""]
+  if (r.cancelled) {
+    lines.push(`${what} (${label}) ends on ${date}, ${inDays}. You chose not to renew it, so it will not continue after that date.`)
+    lines.push("", "Changed your mind? Start a new plan from your account at any time.")
+  } else {
+    lines.push(`${what} (${label}) ends on ${date}, ${inDays}.`)
+    lines.push("", `Plans do not renew automatically. After that date ${who} access to the premium calculators.`)
+    lines.push("", "Renewing the same plan before it ends adds a month after your current end date, so nothing is lost by renewing early.")
+    if (r.graceDays > 0) lines.push("", `If the date passes, there is a grace period of ${r.graceDays} day${r.graceDays === 1 ? "" : "s"} before access stops.`)
+  }
+  lines.push("", r.url, "", "The Clinexia team")
+
+  const subject = r.cancelled ? `Your Clinexia plan ends on ${date}` : `Your Clinexia plan ends ${inDays}`
+  const html = shell(
+    r.cancelled ? `Your plan ends on ${date}` : `Your plan ends ${inDays}`,
+    para(escapeHtml(hello)) +
+      (r.cancelled
+        ? para(`${escapeHtml(what)} (${escapeHtml(label)}) ends on <strong>${escapeHtml(date)}</strong>. You chose not to renew it, so it will not continue after that date.`) +
+          para("Changed your mind? Start a new plan from your account at any time.")
+        : para(`${escapeHtml(what)} (${escapeHtml(label)}) ends on <strong>${escapeHtml(date)}</strong>, ${escapeHtml(inDays)}.`) +
+          para(`Plans do not renew automatically. After that date ${escapeHtml(who)} access to the premium calculators.`) +
+          small("Renewing the same plan before it ends adds a month after your current end date, so nothing is lost by renewing early.") +
+          (r.graceDays > 0 ? small(`If the date passes, there is a grace period of ${r.graceDays} day${r.graceDays === 1 ? "" : "s"} before access stops.`) : "")) +
+      button(r.cancelled ? "Manage your plan" : "Renew your plan", r.url) +
+      linkFallback(r.url),
+  )
+  return { subject, text: lines.join("\n"), html }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// 4. A private message from the administrator
+// ---------------------------------------------------------------------------------------------------------------------
+export function composeAdminMessageEmail(input: { name: string; title: string; body: string; url: string }): ComposedEmail {
+  const hello = input.name.trim() ? `Hello ${input.name.trim()},` : "Hello,"
+  const text = [hello, "", input.body, "", `Open Clinexia: ${input.url}`, "", "The Clinexia team"].join("\n")
+  const paragraphs = input.body.split(/\n{2,}/).map((p) => para(escapeHtml(p).replace(/\n/g, "<br>"))).join("")
+  const html = shell(input.title, para(escapeHtml(hello)) + paragraphs + button("Open Clinexia", input.url))
+  return { subject: input.title, text, html }
+}

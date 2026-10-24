@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getCalculatorById } from "@/lib/calculators/registry"
-import { CATEGORY_SPECIALTY, SPECIALTY_LABELS, billingEnabled, premiumEnforced } from "@/lib/billing/config"
+import { CATEGORY_SPECIALTY, SPECIALTY_LABELS, billingEnabled } from "@/lib/billing/config"
+import { activePersonalTrial, getLaunchStatus } from "@/lib/billing/launch-store"
 import { hasSpecialty, isPremiumCalculator, resolveEntitlements } from "@/lib/billing/entitlements"
 import { currentUser } from "@/lib/billing/session"
 import { getPricing, loadEntitlementInputs } from "@/lib/billing/store"
@@ -10,10 +11,13 @@ export const dynamic = "force-dynamic"
 
 const reply = (data: Record<string, unknown>) => NextResponse.json(data, { headers: { "Cache-Control": "no-store" } })
 
-// Asked by every calculator page. Answers {enforced:false} (nothing locked) unless BILLING_ENFORCE_PREMIUM=true.
+// Asked by every calculator page. Answers {enforced:false} (nothing locked) until billing is switched on (admin button or
+// BILLING_ENFORCE_PREMIUM=true) and the free-trial period, if any, is over.
 // Query: ?id=<calculator id> (preferred) or ?category=<category>. Free tools always answer allowed.
 export async function GET(request: Request) {
-  if (!billingEnabled() || !premiumEnforced()) return reply({ enforced: false, allowed: true })
+  if (!billingEnabled()) return reply({ enforced: false, allowed: true })
+  const launch = await getLaunchStatus()
+  if (!launch.enforced) return reply({ enforced: false, allowed: true, ...(launch.trial ? { trial: true, trialEndsAt: launch.freeUntil } : {}) })
 
   const url = new URL(request.url)
   const id = url.searchParams.get("id") ?? ""
@@ -34,6 +38,7 @@ export async function GET(request: Request) {
     try {
       const [pricing, inputs] = await Promise.all([getPricing(), loadEntitlementInputs(user.id)])
       allowed = hasSpecialty(resolveEntitlements({ ...inputs, now: Date.now(), graceDays: pricing.graceDays }), specialty)
+      if (!allowed) allowed = (await activePersonalTrial(user.id, launch)) !== null // a new user's own free period
     } catch {
       allowed = false // cannot verify: do not unlock premium tools
     }

@@ -9,6 +9,7 @@ import { api } from "@/lib/billing/client"
 import { MARKETS, type Market, type PricingConfig } from "@/lib/billing/config"
 import { formatMoney } from "@/lib/billing/pricing"
 import { PlanDialog, type PlanChoice } from "./plan-dialog"
+import type { LaunchStatus } from "@/lib/billing/launch"
 
 type UserRow = {
   id: string; email: string; fullName: string; accountType: string; source: string; market: Market; status: "active" | "suspended"; createdAt: string | null; lastSignInAt: string | null; confirmed: boolean
@@ -29,6 +30,80 @@ const ENTERPRISE = [
   ["specialtyPerSeatMinor", "One specialty, per seat / month"], ["additionalSpecialtyPerSeatMinor", "Each additional specialty, per seat"], ["allAccessPerSeatMinor", "All-access, per seat / month"],
   ["allAccessBlockMinor", "All-access cap for the first block of seats"], ["extraSeatMinor", "Each seat beyond the block"],
 ] as const
+
+// ----- payments: hidden, or introduced to everyone with free periods -----
+function LaunchPanel({ launch, onChanged }: { launch: LaunchStatus; onChanged: (l: LaunchStatus) => void }) {
+  const [days, setDays] = useState(30)
+  const [newDays, setNewDays] = useState(launch.newUserTrialDays ?? 7)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState("")
+  const daysLeft = launch.freeUntil ? Math.max(0, Math.ceil((Date.parse(launch.freeUntil) - Date.now()) / 86_400_000)) : 0
+  async function apply(enforce: boolean, title: string, description: string, confirmLabel: string) {
+    if (!(await confirmDialog({ title, description, confirmLabel }))) return
+    setBusy(true); setMsg("")
+    const r = await api<{ launch: LaunchStatus }>("/api/admin/billing", { action: "setLaunch", enforce, trialDays: days, newUserTrialDays: newDays })
+    setBusy(false)
+    if (r.ok) { onChanged(r.data.launch); setMsg("Saved. It takes effect within about 15 seconds.") } else setMsg(r.error)
+  }
+  const status = !launch.switchedOn
+    ? "Payments are HIDDEN. Users see no prices, plans or checkout, and nothing is locked. Every calculator is free."
+    : launch.trial
+      ? `Payments are SHOWN. Free period for everyone until ${d(launch.freeUntil)} (${daysLeft} day${daysLeft === 1 ? "" : "s"} left); nothing is locked yet. People who join after ${d(launch.introducedAt)} also get ${launch.newUserTrialDays} free day${launch.newUserTrialDays === 1 ? "" : "s"} from signup.`
+      : `Payments are SHOWN and premium calculators are locked for people without a plan. People who join after ${d(launch.introducedAt)} get ${launch.newUserTrialDays} free day${launch.newUserTrialDays === 1 ? "" : "s"} from signup.`
+  const box = "w-24 rounded-md border bg-background px-2 py-1.5"
+  const clamp = (v: string, max: number) => Math.max(0, Math.min(max, Math.floor(Number(v) || 0)))
+  return (
+    <section className="rounded-lg border p-4 space-y-3 text-sm">
+      <h3 className="font-medium">Payments for users</h3>
+      <p role="status">{status}</p>
+      {launch.envForced && <p className="text-xs text-muted-foreground">The server setting BILLING_ENFORCE_PREMIUM=true also forces payments on, so “Hide payments” cannot hide them until that setting is removed in Vercel. The free periods still work.</p>}
+      <div className="grid gap-2 sm:grid-cols-2">
+        <label className="flex items-center justify-between gap-3"><span>Free period for everyone already here (days, 0 = none)</span><input type="number" min={0} max={365} step={1} className={box} value={days} onChange={(e) => setDays(clamp(e.target.value, 365))} /></label>
+        <label className="flex items-center justify-between gap-3"><span>Free days for each new user from signup (0 = none)</span><input type="number" min={0} max={60} step={1} className={box} value={newDays} onChange={(e) => setNewDays(clamp(e.target.value, 60))} /></label>
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        {!launch.adminOn ? (
+          <Button disabled={busy} onClick={() => apply(true, "Show payments to everyone?", `Prices, plans and checkout appear for new and existing users. ${days > 0 ? `Everyone keeps full access for ${days} days, then premium calculators lock for people without a plan.` : "Premium calculators lock right away for people without a plan."} People who join from now on get ${newDays} free days from signup.`, "Show payments")}>Show payments to users</Button>
+        ) : (
+          <>
+            <Button disabled={busy} onClick={() => apply(true, "Change the free periods?", `The free period for everyone will end ${days} days from now. New users get ${newDays} free days from signup.`, "Save")}>Save free periods</Button>
+            <Button variant="outline" disabled={busy} onClick={() => apply(false, "Hide payments again?", "Prices, plans and checkout disappear for everyone and every calculator becomes free. Plans people already paid for are kept.", "Hide payments")}>Hide payments</Button>
+          </>
+        )}
+        {busy && <Loader2 className="h-4 w-4 animate-spin" aria-label="Saving" />}{msg && <span role="status">{msg}</span>}
+      </div>
+      <p className="text-xs text-muted-foreground">“Already here” means everyone, including visitors who are not signed in. Set your real prices below and test a payment before showing payments.</p>
+    </section>
+  )
+}
+
+// ----- a private message to one person: in their app and account page, on their phone, and by email -----
+function MessageBox({ userId, email }: { userId: string; email: string }) {
+  const [title, setTitle] = useState("")
+  const [text, setText] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState("")
+  async function send() {
+    if (!(await confirmDialog({ title: `Send this message to ${email}?`, description: "Only this person sees it. It appears in their app and account page, on their phone, and in their email.", confirmLabel: "Send" }))) return
+    setBusy(true); setMsg("")
+    const r = await api<{ push: string; phones: number; email: string }>("/api/admin/accounts", { action: "sendMessage", userId, title, body: text })
+    setBusy(false)
+    if (!r.ok) { setMsg(r.error); return }
+    const phone = r.data.push === "sent" ? `sent to ${r.data.phones} phone${r.data.phones === 1 ? "" : "s"}` : r.data.push === "no_phones" ? "no phone linked to this account" : r.data.push === "not_configured" ? "phone notifications are not set up" : "phone notification failed"
+    const mail = r.data.email === "sent" ? "sent" : r.data.email === "not_configured" ? "email is not set up" : r.data.email === "no_address" ? "no email address" : "failed"
+    setMsg(`Saved in their app. Phone: ${phone}. Email: ${mail}.`)
+    setTitle(""); setText("")
+  }
+  return (
+    <div className="space-y-2 rounded-md border p-3">
+      <p className="font-medium">Send a private message</p>
+      <input className="w-full rounded-md border bg-background px-2 py-1.5 text-sm" maxLength={65} placeholder="Title (up to 65 characters)" value={title} onChange={(e) => setTitle(e.target.value)} />
+      <textarea className="w-full rounded-md border bg-background px-2 py-1.5 text-sm" rows={4} maxLength={500} placeholder="Message (up to 500 characters)" value={text} onChange={(e) => setText(e.target.value)} />
+      <div className="flex flex-wrap items-center gap-3"><Button disabled={busy || !title.trim() || !text.trim()} onClick={send}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send message"}</Button>{msg && <span role="status" className="text-xs">{msg}</span>}</div>
+      <p className="text-xs text-muted-foreground">{text.length}/500 · Reaches this person only.</p>
+    </div>
+  )
+}
 
 function PricingEditor({ initial, onSaved }: { initial: PricingConfig; onSaved: (p: PricingConfig) => void }) {
   const [cfg, setCfg] = useState<PricingConfig>(initial)
@@ -78,6 +153,7 @@ export function AccountsAdmin() {
   const [orgs, setOrgs] = useState<OrgRow[]>([])
   const [audit, setAudit] = useState<AuditRow[]>([])
   const [pricing, setPricing] = useState<PricingConfig | null>(null)
+  const [launch, setLaunch] = useState<LaunchStatus | null>(null)
   const [detail, setDetail] = useState<Detail | null>(null)
   const [planUser, setPlanUser] = useState<UserRow | null>(null)
   const [detailId, setDetailId] = useState("")
@@ -90,8 +166,8 @@ export function AccountsAdmin() {
     if (r.ok) { setUsers(r.data.users); setTruncated(r.data.truncated) } else { setUsers([]); setMsg(r.status === 401 ? "Admin session expired. Sign in again." : r.error) }
   }, [])
   const loadBilling = useCallback(async () => {
-    const r = await api<{ pricing: PricingConfig; organisations: OrgRow[]; audit: AuditRow[] }>("/api/admin/billing")
-    if (r.ok) { setPricing(r.data.pricing); setOrgs(r.data.organisations); setAudit(r.data.audit) }
+    const r = await api<{ pricing: PricingConfig; organisations: OrgRow[]; audit: AuditRow[]; launch: LaunchStatus }>("/api/admin/billing")
+    if (r.ok) { setPricing(r.data.pricing); setOrgs(r.data.organisations); setAudit(r.data.audit); setLaunch(r.data.launch) }
   }, [])
   useEffect(() => { void loadUsers(""); void loadBilling() }, [loadUsers, loadBilling])
 
@@ -196,6 +272,7 @@ export function AccountsAdmin() {
               <div className="flex justify-between"><p className="font-medium">{detail.user.email}</p><button className="underline" onClick={() => setDetail(null)}>Close</button></div>
               <p>Status: {detail.status.status}{detail.status.reason ? ` (${detail.status.reason})` : ""}</p>
               <p>Organisations: {detail.memberships.length ? detail.memberships.map((m) => `${m.name} (${m.role})`).join(", ") : "none"}</p>
+              <MessageBox key={detailId} userId={detailId} email={detail.user.email} />
               <p className="font-medium">Devices linked to this account ({detail.devices.length})</p>
               {detail.devices.length === 0 ? <p className="text-xs text-muted-foreground">None yet. A device links when this person registers or signs in on it. Devices used before they registered are included from then on.</p> : (
                 <ul className="space-y-1 text-xs">
@@ -255,7 +332,7 @@ export function AccountsAdmin() {
         </section>
       )}
 
-      {tab === "Pricing" && (pricing ? <PricingEditor initial={pricing} onSaved={setPricing} /> : <Loader2 className="h-5 w-5 animate-spin" aria-label="Loading" />)}
+      {tab === "Pricing" && (pricing ? <div className="space-y-6">{launch && <LaunchPanel launch={launch} onChanged={setLaunch} />}<PricingEditor initial={pricing} onSaved={setPricing} /></div> : <Loader2 className="h-5 w-5 animate-spin" aria-label="Loading" />)}
 
       {tab === "Audit" && (
         <section className="overflow-x-auto rounded-lg border">

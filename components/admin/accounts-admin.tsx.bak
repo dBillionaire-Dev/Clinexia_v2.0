@@ -9,6 +9,7 @@ import { api } from "@/lib/billing/client"
 import { MARKETS, type Market, type PricingConfig } from "@/lib/billing/config"
 import { formatMoney } from "@/lib/billing/pricing"
 import { PlanDialog, type PlanChoice } from "./plan-dialog"
+import type { LaunchStatus } from "@/lib/billing/launch"
 
 type UserRow = {
   id: string; email: string; fullName: string; accountType: string; source: string; market: Market; status: "active" | "suspended"; createdAt: string | null; lastSignInAt: string | null; confirmed: boolean
@@ -29,6 +30,46 @@ const ENTERPRISE = [
   ["specialtyPerSeatMinor", "One specialty, per seat / month"], ["additionalSpecialtyPerSeatMinor", "Each additional specialty, per seat"], ["allAccessPerSeatMinor", "All-access, per seat / month"],
   ["allAccessBlockMinor", "All-access cap for the first block of seats"], ["extraSeatMinor", "Each seat beyond the block"],
 ] as const
+
+// ----- the "Switch on billing" button and the free-trial period -----
+function LaunchPanel({ launch, onChanged }: { launch: LaunchStatus; onChanged: (l: LaunchStatus) => void }) {
+  const [days, setDays] = useState(30)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState("")
+  const daysLeft = launch.freeUntil ? Math.max(0, Math.ceil((Date.parse(launch.freeUntil) - Date.now()) / 86_400_000)) : 0
+  async function apply(enforce: boolean, title: string, description: string, confirmLabel: string) {
+    if (!(await confirmDialog({ title, description, confirmLabel }))) return
+    setBusy(true); setMsg("")
+    const r = await api<{ launch: LaunchStatus }>("/api/admin/billing", { action: "setLaunch", enforce, trialDays: days })
+    setBusy(false)
+    if (r.ok) { onChanged(r.data.launch); setMsg("Saved. It takes effect within about 15 seconds.") } else setMsg(r.error)
+  }
+  const status = !launch.switchedOn
+    ? "Billing is OFF. Every calculator is free for everyone."
+    : launch.trial
+      ? `Billing is ON, in the free-trial period: everyone has full access until ${d(launch.freeUntil)} (${daysLeft} day${daysLeft === 1 ? "" : "s"} left). Premium calculators lock for people without a plan after that.`
+      : "Billing is ON. Premium calculators are locked for people without a plan."
+  return (
+    <section className="rounded-lg border p-4 space-y-3 text-sm">
+      <h3 className="font-medium">Switch on billing</h3>
+      <p role="status">{status}</p>
+      {launch.envForced && <p className="text-xs text-muted-foreground">The server setting BILLING_ENFORCE_PREMIUM=true also forces locking on, so “Switch off” cannot turn it off until that setting is removed in Vercel. The free trial still works.</p>}
+      <label className="flex items-center gap-3"><span>Free trial for everyone (days, 0 = none)</span><input type="number" min={0} max={365} step={1} className="w-24 rounded-md border bg-background px-2 py-1.5" value={days} onChange={(e) => setDays(Math.max(0, Math.min(365, Math.floor(Number(e.target.value) || 0))))} /></label>
+      <div className="flex flex-wrap items-center gap-3">
+        {!launch.adminOn ? (
+          <Button disabled={busy} onClick={() => apply(true, "Switch on billing?", days > 0 ? `Everyone keeps full access for ${days} days. After that, premium calculators lock for people without a paid plan.` : "Premium calculators lock right away for people without a paid plan.", "Switch on")}>Switch on billing</Button>
+        ) : (
+          <>
+            <Button disabled={busy} onClick={() => apply(true, "Change the free trial?", days > 0 ? `The free trial will end ${days} days from now.` : "The free trial ends now and premium calculators lock.", "Save")}>Set trial from today</Button>
+            <Button variant="outline" disabled={busy} onClick={() => apply(false, "Switch off billing?", "Every calculator becomes free again for everyone. Plans people already paid for are kept.", "Switch off")}>Switch off billing</Button>
+          </>
+        )}
+        {busy && <Loader2 className="h-4 w-4 animate-spin" aria-label="Saving" />}{msg && <span role="status">{msg}</span>}
+      </div>
+      <p className="text-xs text-muted-foreground">Set your real prices below and test a payment before switching on. People can still pay during the trial.</p>
+    </section>
+  )
+}
 
 function PricingEditor({ initial, onSaved }: { initial: PricingConfig; onSaved: (p: PricingConfig) => void }) {
   const [cfg, setCfg] = useState<PricingConfig>(initial)
@@ -78,6 +119,7 @@ export function AccountsAdmin() {
   const [orgs, setOrgs] = useState<OrgRow[]>([])
   const [audit, setAudit] = useState<AuditRow[]>([])
   const [pricing, setPricing] = useState<PricingConfig | null>(null)
+  const [launch, setLaunch] = useState<LaunchStatus | null>(null)
   const [detail, setDetail] = useState<Detail | null>(null)
   const [planUser, setPlanUser] = useState<UserRow | null>(null)
   const [detailId, setDetailId] = useState("")
@@ -90,8 +132,8 @@ export function AccountsAdmin() {
     if (r.ok) { setUsers(r.data.users); setTruncated(r.data.truncated) } else { setUsers([]); setMsg(r.status === 401 ? "Admin session expired. Sign in again." : r.error) }
   }, [])
   const loadBilling = useCallback(async () => {
-    const r = await api<{ pricing: PricingConfig; organisations: OrgRow[]; audit: AuditRow[] }>("/api/admin/billing")
-    if (r.ok) { setPricing(r.data.pricing); setOrgs(r.data.organisations); setAudit(r.data.audit) }
+    const r = await api<{ pricing: PricingConfig; organisations: OrgRow[]; audit: AuditRow[]; launch: LaunchStatus }>("/api/admin/billing")
+    if (r.ok) { setPricing(r.data.pricing); setOrgs(r.data.organisations); setAudit(r.data.audit); setLaunch(r.data.launch) }
   }, [])
   useEffect(() => { void loadUsers(""); void loadBilling() }, [loadUsers, loadBilling])
 
@@ -141,12 +183,21 @@ export function AccountsAdmin() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Accounts</h1>
-        <Link href="/admin" className="text-sm underline">← Admin home</Link>
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <button className="underline" onClick={async () => {
+            if (!(await confirmDialog({ title: "Link devices from existing activity?", description: "Devices that registered for notifications or answered a form while signed in are attached to those accounts, and every linked device gets its account's name. Safe to repeat.", confirmLabel: "Link devices" }))) return
+            const r = await api<{ linksAdded: number; renamed: number }>("/api/admin/accounts", { action: "backfillLinks" })
+            setMsg(r.ok ? `Done. ${r.data.linksAdded} new link${r.data.linksAdded === 1 ? "" : "s"}, ${r.data.renamed} device${r.data.renamed === 1 ? "" : "s"} now show the account's name.` : r.error)
+          }}>Link devices from existing activity</button>
+          <Link href="/admin/setup" className="underline">Setup check</Link>
+          <Link href="/admin" className="underline">← Admin home</Link>
+        </div>
       </header>
       <nav className="flex gap-2" aria-label="Sections">
         {TABS.map((t) => <button key={t} onClick={() => setTab(t)} aria-current={tab === t} className={`rounded-full border px-4 py-1.5 text-sm ${tab === t ? "border-primary bg-primary text-primary-foreground" : "hover:bg-muted"}`}>{t}</button>)}
       </nav>
       {msg && <p role="status" className="rounded-md border p-2 text-sm">{msg}</p>}
+      {msg && /Run supabase|missing|Could not load/i.test(msg) && <p className="text-sm"><Link href="/admin/setup" className="underline">Open the setup check</Link> to see exactly what is missing.</p>}
       {planUser && <PlanDialog email={planUser.email} current={planText(planUser)} onClose={() => setPlanUser(null)} onSave={(c) => savePlan(planUser, c)} />}
 
       {tab === "Users" && (
@@ -246,7 +297,7 @@ export function AccountsAdmin() {
         </section>
       )}
 
-      {tab === "Pricing" && (pricing ? <PricingEditor initial={pricing} onSaved={setPricing} /> : <Loader2 className="h-5 w-5 animate-spin" aria-label="Loading" />)}
+      {tab === "Pricing" && (pricing ? <div className="space-y-6">{launch && <LaunchPanel launch={launch} onChanged={setLaunch} />}<PricingEditor initial={pricing} onSaved={setPricing} /></div> : <Loader2 className="h-5 w-5 animate-spin" aria-label="Loading" />)}
 
       {tab === "Audit" && (
         <section className="overflow-x-auto rounded-lg border">

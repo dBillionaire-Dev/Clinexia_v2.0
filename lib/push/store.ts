@@ -14,6 +14,17 @@ export async function listTokens(audience: PushAudience, limit = 5000): Promise<
   return rows.map((r) => r.token as string)
 }
 
+/** The phones this person is signed in on. */
+export async function listTokensForUser(userId: string, limit = 50): Promise<string[]> {
+  const rows = await db.select("push_devices", `select=token&user_id=eq.${uuid(userId)}&order=last_seen.desc&limit=${limit}`)
+  return rows.map((r) => r.token as string)
+}
+
+export async function createUserMessage(m: { title: string; body: string; userId: string }): Promise<string> {
+  const row = await db.insert("push_messages", { title: m.title, body: m.body, url: "", audience: "user", user_id: uuid(m.userId) })
+  return String(row!.id)
+}
+
 export async function removeTokens(tokens: string[]) {
   for (let i = 0; i < tokens.length; i += 50) {
     const batch = tokens.slice(i, i + 50).map((t) => `"${t}"`).join(",")
@@ -37,14 +48,17 @@ export async function finishMessage(id: string, c: { sent: number; failed: numbe
 }
 
 /** Messages an app should show on open (so a notification that was missed or swiped away is not lost): the last week, for this person's audience. */
-export async function listRecentMessages(signedIn: boolean, days = 7, limit = 5) {
+export async function listRecentMessages(signedIn: boolean, days = 7, limit = 5, userId?: string) {
   const since = encodeURIComponent(new Date(Date.now() - days * 86_400_000).toISOString())
   const audiences = signedIn ? "everyone,signed_in" : "everyone,guests"
-  const rows = await db.select("push_messages", `select=id,title,body,url,created_at&audience=in.(${audiences})&created_at=gte.${since}&order=created_at.desc&limit=${limit}`)
-  return rows.map((r) => ({ id: String(r.id), title: r.title as string, body: r.body as string, url: (r.url ?? "") as string, createdAt: r.created_at as string }))
+  const shared = await db.select("push_messages", `select=id,title,body,url,created_at&audience=in.(${audiences})&created_at=gte.${since}&order=created_at.desc&limit=${limit}`)
+  // Private messages from the admin: only ever returned to the person they were written for.
+  const mine = userId ? await db.select("push_messages", `select=id,title,body,url,created_at&audience=eq.user&user_id=eq.${uuid(userId)}&created_at=gte.${since}&order=created_at.desc&limit=10`).catch(() => []) : []
+  const shape = (r: any, priv: boolean) => ({ id: String(r.id), title: r.title as string, body: r.body as string, url: (r.url ?? "") as string, createdAt: r.created_at as string, ...(priv ? { private: true } : {}) })
+  return [...shared.map((r) => shape(r, false)), ...mine.map((r) => shape(r, true))].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
 }
 
 export async function listMessages() {
-  const rows = await db.select("push_messages", "select=*&order=created_at.desc&limit=30")
+  const rows = await db.select("push_messages", "select=*&audience=neq.user&order=created_at.desc&limit=30")
   return rows.map((r) => ({ id: uuid(r.id), title: r.title as string, body: r.body as string, url: r.url as string, audience: r.audience as string, sent: r.sent_count as number, failed: r.failed_count as number, removed: r.removed_count as number, createdAt: r.created_at as string }))
 }

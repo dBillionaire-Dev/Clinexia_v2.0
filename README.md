@@ -343,6 +343,7 @@ Clinexia works without an account. Accounts add premium plans, organisations, an
 | `PAYSTACK_SECRET_KEY` | payments |
 | `FCM_SERVICE_ACCOUNT_JSON` | phone notifications |
 | `RESEND_API_KEY`, `BILLING_FROM_EMAIL` | emails: invitations, payment receipts, plan-ending reminders, account notices (optional). `BILLING_FROM_EMAIL` like `Clinexia <billing@yourdomain>` on a domain verified in Resend |
+| `BILLING_ENFORCE_PREMIUM` | optional. Premium locking is normally switched on from Admin > Pricing ("Switch on billing", with a free-trial period); `true` here forces it on |
 | `BILLING_REPLY_TO_EMAIL` | where replies go (optional) |
 | `CRON_SECRET` | any long random string; protects the daily reminder job in `vercel.json` |
 | `PLAN_REMINDER_DAYS` | days before a plan ends that the reminder goes out (optional, default 3) |

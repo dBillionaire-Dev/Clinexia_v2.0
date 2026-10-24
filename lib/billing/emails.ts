@@ -176,3 +176,44 @@ export function composeReminderEmail(r: ReminderInput): ComposedEmail {
   )
   return { subject, text: lines.join("\n"), html }
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
+// 4. A private message from the administrator
+// ---------------------------------------------------------------------------------------------------------------------
+export function composeAdminMessageEmail(input: { name: string; title: string; body: string; url: string }): ComposedEmail {
+  const hello = input.name.trim() ? `Hello ${input.name.trim()},` : "Hello,"
+  const text = [hello, "", input.body, "", `Open Clinexia: ${input.url}`, "", "The Clinexia team"].join("\n")
+  const paragraphs = input.body.split(/\n{2,}/).map((p) => para(escapeHtml(p).replace(/\n/g, "<br>"))).join("")
+  const html = shell(input.title, para(escapeHtml(hello)) + paragraphs + button("Open Clinexia", input.url))
+  return { subject: input.title, text, html }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// 5. Password reset link, and the "your password was changed" notice
+// ---------------------------------------------------------------------------------------------------------------------
+export function composePasswordResetEmail(input: { name: string; link: string }): ComposedEmail {
+  const hello = input.name.trim() ? `Hello ${input.name.trim()},` : "Hello,"
+  const text = [
+    hello, "",
+    "We received a request to reset your Clinexia password. Open this link to choose a new one:", input.link, "",
+    "The link works once and stops working after a short time. If you did not ask for this, ignore this email: your password stays as it is.", "",
+    "The Clinexia team",
+  ].join("\n")
+  const html = shell(
+    "Reset your password",
+    para(escapeHtml(hello)) + para("We received a request to reset your Clinexia password.") + button("Choose a new password", input.link) +
+      small("The link works once and stops working after a short time. If you did not ask for this, ignore this email: your password stays as it is.") + linkFallback(input.link),
+  )
+  return { subject: "Reset your Clinexia password", text, html }
+}
+
+export function composePasswordChangedEmail(input: { name: string; url: string }): ComposedEmail {
+  const hello = input.name.trim() ? `Hello ${input.name.trim()},` : "Hello,"
+  const text = [hello, "", "The password on your Clinexia account was just changed, and you were signed out everywhere.", "", `If this was you, nothing more to do: sign in with your new password at ${input.url}`, "If it was not you, reset your password again straight away from the sign-in page and tell us.", "", "The Clinexia team"].join("\n")
+  const html = shell(
+    "Your password was changed",
+    para(escapeHtml(hello)) + para("The password on your Clinexia account was just changed, and you were signed out everywhere.") +
+      para("If this was you, nothing more to do. If it was not you, reset your password again straight away from the sign-in page and tell us.") + button("Go to sign in", input.url),
+  )
+  return { subject: "Your Clinexia password was changed", text, html }
+}

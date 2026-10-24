@@ -3,6 +3,7 @@ import { detectMarket, guard, json, problem, readJson } from "@/lib/billing/rout
 import { orgStore, getPricing, getUserMarket } from "@/lib/billing/store"
 import type { Market } from "@/lib/billing/config"
 import { currentUser } from "@/lib/billing/session"
+import { getLaunchStatus } from "@/lib/billing/launch-store"
 
 export const dynamic = "force-dynamic"
 
@@ -18,6 +19,7 @@ export async function POST(request: Request) {
     return problem("Invalid request.", 400)
   }
   if (!body || typeof body !== "object") return problem("Invalid request.", 400)
+  if (!(await getLaunchStatus()).switchedOn) return problem("Payments are not open yet.", 403)
 
   let managedStatus: ManagedStatus = "none"
   const user = await currentUser().catch(() => null)

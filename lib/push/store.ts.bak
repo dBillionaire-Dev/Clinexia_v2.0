@@ -27,8 +27,21 @@ export async function deviceCounts() {
   return { total: rows.length, signedIn, guests: rows.length - signedIn }
 }
 
-export async function saveMessage(m: { title: string; body: string; url: string; audience: PushAudience; sent: number; failed: number; removed: number }) {
-  await db.insert("push_messages", { title: m.title, body: m.body, url: m.url, audience: m.audience, sent_count: m.sent, failed_count: m.failed, removed_count: m.removed })
+export async function createMessage(m: { title: string; body: string; url: string; audience: PushAudience }): Promise<string> {
+  const row = await db.insert("push_messages", { title: m.title, body: m.body, url: m.url, audience: m.audience })
+  return String(row!.id)
+}
+
+export async function finishMessage(id: string, c: { sent: number; failed: number; removed: number }) {
+  await db.update("push_messages", `id=eq.${uuid(id)}`, { sent_count: c.sent, failed_count: c.failed, removed_count: c.removed })
+}
+
+/** Messages an app should show on open (so a notification that was missed or swiped away is not lost): the last week, for this person's audience. */
+export async function listRecentMessages(signedIn: boolean, days = 7, limit = 5) {
+  const since = encodeURIComponent(new Date(Date.now() - days * 86_400_000).toISOString())
+  const audiences = signedIn ? "everyone,signed_in" : "everyone,guests"
+  const rows = await db.select("push_messages", `select=id,title,body,url,created_at&audience=in.(${audiences})&created_at=gte.${since}&order=created_at.desc&limit=${limit}`)
+  return rows.map((r) => ({ id: String(r.id), title: r.title as string, body: r.body as string, url: (r.url ?? "") as string, createdAt: r.created_at as string }))
 }
 
 export async function listMessages() {
