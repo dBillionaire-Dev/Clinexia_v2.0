@@ -35,3 +35,6 @@ next-env.d.ts
 
 # backups made by clinexia-apply.sh
 .clinexia-backup/
+
+# backup files
+*.bak*
