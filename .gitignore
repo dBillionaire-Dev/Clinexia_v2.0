@@ -5,6 +5,8 @@
 /.next/
 /out/
 
+*.sh
+
 # production
 /build
 
