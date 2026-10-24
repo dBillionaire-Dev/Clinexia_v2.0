@@ -14,6 +14,7 @@ import { ApplyPreferences } from "@/components/apply-preferences"
 import { AnalyticsSync } from "@/components/analytics-sync"
 import { UpdateWatcher } from "@/components/update-watcher"
 import { DiagnosticsShortcut } from "@/components/diagnostics-shortcut"
+import { SiteChrome } from "@/components/site-chrome"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -96,9 +97,9 @@ export default function RootLayout({
       </head>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <SkipToContent />
+          <SiteChrome><SkipToContent /></SiteChrome>
           <div className="min-h-screen flex flex-col bg-background">
-            <AppHeader />
+            <SiteChrome><AppHeader /></SiteChrome>
 
                  <main
                    id="main-content"
@@ -108,15 +109,15 @@ export default function RootLayout({
                    {children}
                  </main>
 
-                 <AppFooter />
+                 <SiteChrome><AppFooter /></SiteChrome>
           </div>
-          <CommandPalette />
-          <InstallPrompt />
-          <ServiceWorkerRegistration />
-          <ApplyPreferences />
-          <AnalyticsSync />
-          <UpdateWatcher />
-          <DiagnosticsShortcut />
+          <SiteChrome><CommandPalette /></SiteChrome>
+          <SiteChrome><InstallPrompt /></SiteChrome>
+          <SiteChrome><ServiceWorkerRegistration /></SiteChrome>
+          <SiteChrome><ApplyPreferences /></SiteChrome>
+          <SiteChrome><AnalyticsSync /></SiteChrome>
+          <SiteChrome><UpdateWatcher /></SiteChrome>
+          <SiteChrome><DiagnosticsShortcut /></SiteChrome>
           <Toaster />
         </ThemeProvider>
       </body>

@@ -38,3 +38,6 @@ next-env.d.ts
 
 # backup files
 *.bak*
+
+# keep the documented example env file
+!.env.example
