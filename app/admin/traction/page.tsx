@@ -5,6 +5,7 @@ import { AdminNav, Card, ExportLink, Section, SimpleTable, num, pct } from "@/co
 import { HorizontalBars, MonthlyTrends } from "@/components/admin/traction-charts"
 
 export const dynamic = "force-dynamic"
+export const maxDuration = 60
 
 const RAW_EXPORTS: [string, string][] = [
   ["daily_rollups", "Daily rollups"],
@@ -15,14 +16,15 @@ const RAW_EXPORTS: [string, string][] = [
   ["revenue_entries", "Revenue entries"],
 ]
 
-export default async function TractionPage({ searchParams }: { searchParams: Promise<{ from?: string; to?: string }> }) {
+export default async function TractionPage({ searchParams }: { searchParams: Promise<{ from?: string; to?: string; refresh?: string }> }) {
   if (!(await isAdminAuthenticated())) redirect("/admin/login")
-  const range = resolveRange(await searchParams)
+  const params = await searchParams
+  const range = resolveRange(params)
 
   let data: Awaited<ReturnType<typeof loadDashboard>> | null = null
   let error: string | null = null
   try {
-    data = await loadDashboard(range)
+    data = await loadDashboard(range, { force: params.refresh === "1" })
   } catch (e) {
     error = e instanceof Error ? e.message : "Could not load traction data. Did you run supabase/traction.sql?"
   }
@@ -40,7 +42,10 @@ export default async function TractionPage({ searchParams }: { searchParams: Pro
           <label className="text-sm">From<input type="date" name="from" defaultValue={range.from} className="ml-2 rounded-md border bg-background px-2 py-1.5" /></label>
           <label className="text-sm">To<input type="date" name="to" defaultValue={range.to} className="ml-2 rounded-md border bg-background px-2 py-1.5" /></label>
           <button className="rounded-md border bg-background px-3 py-2 text-sm font-medium hover:bg-muted">Apply</button>
+          <button name="refresh" value="1" className="rounded-md border bg-background px-3 py-2 text-sm font-medium hover:bg-muted">Refresh now</button>
         </form>
+        {data?.refresh.error ? <p role="alert" className="mt-3 rounded-md border border-amber-500/40 bg-amber-50 p-3 text-sm text-amber-900">The latest numbers could not be refreshed ({data.refresh.error}). The figures below are from the last successful refresh.</p> : null}
+        {data?.refresh.refreshedAt ? <p className="mt-2 text-xs text-muted-foreground">Last refreshed {new Date(data.refresh.refreshedAt).toISOString().slice(0, 16).replace("T", " ")} UTC. Refreshes itself when you open this page.</p> : null}
 
         {error ? <div role="alert" className="mt-6 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</div> : null}
 
@@ -70,6 +75,7 @@ export default async function TractionPage({ searchParams }: { searchParams: Pro
                 <Card label="Total tool uses" value={num(data.cards.totalToolUses)} />
                 <Card label="APK downloads (total)" value={num(data.cards.apk.total)} hint={`Last 30 days: ${num(data.cards.apk.last30)} · GitHub only`} />
                 <Card label="PWA installs" value={num(data.cards.installsTotal)} hint={`Last 30 days: ${num(data.cards.installs30)} · undercounts (no Safari/iOS)`} />
+                <Card label="Subscription revenue (automatic)" value={data.cards.subscriptionRevenue ? `₦${num(Math.round(data.cards.subscriptionRevenue.totals.NGN))} · $${num(Math.round(data.cards.subscriptionRevenue.totals.USD))}` : "–"} hint={data.cards.subscriptionRevenue ? `${num(data.cards.subscriptionRevenue.payments)} paid orders · counted from payments` : "No payment data yet"} />
                 <Card label="Search clicks (28 days)" value={num(data.cards.gscClicks28)} hint={data.cards.gscWindow ? `${data.cards.gscWindow.from} → ${data.cards.gscWindow.to}` : "No Search Console data yet"} />
                 <Card label="Search impressions (28 days)" value={num(data.cards.gscImpressions28)} />
                 <Card label="Retention D1" value={pct(data.cards.retention.d1.rate)} hint={`${num(data.cards.retention.d1.retained)} of ${num(data.cards.retention.d1.cohort)}`} />

@@ -45,6 +45,7 @@ export async function loadEntitlementInputs(userId: string): Promise<{ individua
   const [own, mems] = await Promise.all([db.select("billing_subscriptions", `select=*&user_id=eq.${uid}`), db.select("billing_memberships", `select=*&user_id=eq.${uid}`)])
   const memberships: MembershipContext[] = []
   for (const m of mems) {
+    if (m.disabled === true) continue // disabled by the organisation: no access through it (it keeps its seat)
     const orgId = uuid(m.org_id)
     const [[org], [sub], order] = await Promise.all([
       db.select("billing_organisations", `select=*&id=eq.${orgId}`),
@@ -76,6 +77,7 @@ export async function listUserOrganisations(userId: string) {
 
 const toMember = (m: Row, profile?: Row, email?: string): MemberRecord => ({
   userId: m.user_id, email: email ?? "", fullName: profile?.full_name ?? "", role: m.role, allSpecialties: m.all_specialties === true, specialties: specs(m.specialties), joinedAt: m.joined_at,
+  groupId: m.group_id ?? null, disabled: m.disabled === true, managed: m.managed === true,
 })
 
 async function emailsFor(userIds: string[]): Promise<Map<string, string>> {

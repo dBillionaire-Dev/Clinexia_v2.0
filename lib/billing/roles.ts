@@ -4,11 +4,11 @@ import { SPECIALTIES } from "./config"
 import type { PlanRecord } from "./entitlements"
 
 export type OrgRole = "owner" | "admin" | "staff"
-export type OrgAction = "org.view" | "org.update" | "org.billing" | "member.invite" | "member.remove" | "member.setSpecialties" | "member.setRole" | "invite.revoke"
+export type OrgAction = "org.view" | "org.update" | "org.billing" | "member.invite" | "member.remove" | "member.setSpecialties" | "member.setRole" | "invite.revoke" | "directory.manage"
 
 const MATRIX: Record<OrgRole, ReadonlySet<OrgAction>> = {
-  owner: new Set<OrgAction>(["org.view", "org.update", "org.billing", "member.invite", "member.remove", "member.setSpecialties", "member.setRole", "invite.revoke"]),
-  admin: new Set<OrgAction>(["org.view", "member.invite", "member.remove", "member.setSpecialties", "invite.revoke"]),
+  owner: new Set<OrgAction>(["org.view", "org.update", "org.billing", "member.invite", "member.remove", "member.setSpecialties", "member.setRole", "invite.revoke", "directory.manage"]),
+  admin: new Set<OrgAction>(["org.view", "member.invite", "member.remove", "member.setSpecialties", "invite.revoke", "directory.manage"]),
   staff: new Set<OrgAction>([]),
 }
 

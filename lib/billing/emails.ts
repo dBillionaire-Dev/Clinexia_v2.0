@@ -217,3 +217,26 @@ export function composePasswordChangedEmail(input: { name: string; url: string }
   )
   return { subject: "Your Clinexia password was changed", text, html }
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
+// 6. An organisation created an account for you
+// ---------------------------------------------------------------------------------------------------------------------
+export function composeAccountCreatedEmail(input: { name: string; orgName: string; adminName: string; link: string; loginUrl: string; email: string }): ComposedEmail {
+  const hello = input.name.trim() ? `Hello ${input.name.trim()},` : "Hello,"
+  const who = input.adminName.trim() || "An administrator"
+  const text = [
+    hello, "",
+    `${who} has set up a Clinexia account for you as part of ${input.orgName}.`, "",
+    "Choose your password to start (the link works once and expires after a short time):", input.link, "",
+    `If the link has expired, open ${input.loginUrl}, choose “Forgot password?” and enter ${input.email}.`, "",
+    "If you were not expecting this, you can ignore this email.", "", "The Clinexia team",
+  ].join("\n")
+  const html = shell(
+    `Your Clinexia account is ready`,
+    para(escapeHtml(hello)) + para(`<strong>${escapeHtml(who)}</strong> has set up a Clinexia account for you as part of <strong>${escapeHtml(input.orgName)}</strong>.`) +
+      button("Choose your password", input.link) +
+      small(`The link works once and expires after a short time. If it has expired, open the sign-in page, choose “Forgot password?” and enter ${escapeHtml(input.email)}.`) +
+      small("If you were not expecting this, you can ignore this email.") + linkFallback(input.link),
+  )
+  return { subject: `${who} added you to ${input.orgName} on Clinexia`, text, html }
+}

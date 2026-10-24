@@ -2,13 +2,19 @@ import {
   acceptInvitation, createOrganisation, getDashboard, inviteMembers, leaveOrganisation, removeMember, revokeInvitation, setMemberSpecialties, type Settings,
 } from "@/lib/billing/org-actions"
 import { can } from "@/lib/billing/roles"
-import { failure, guard, isResponse, json, problem, readJson, requireUser } from "@/lib/billing/route-kit"
+import { clientKey, failure, guard, isResponse, json, problem, readJson, requireUser } from "@/lib/billing/route-kit"
 import { getPricing, orgStore, recordAudit, setManagedStatus } from "@/lib/billing/store"
 import { validateOrganisation } from "@/lib/billing/validation"
 import { emailInvitations, publicBaseUrl } from "@/lib/billing/email-flows"
 import { emailConfigured } from "@/lib/billing/notify"
+import { accountServiceFor, directoryStore } from "@/lib/billing/directory-store"
+import { emailNewPeople } from "@/lib/billing/directory-flows"
+import { addPeople, authoriseMemberPasswordReset, createGroup, deleteGroup, parsePeopleCsv, renameGroup, setMemberDisabled, setMemberGroup, type PersonRow } from "@/lib/billing/org-directory"
+import { requestPasswordReset } from "@/lib/billing/password-reset"
+import { allowSubmission } from "@/lib/feedback/rate-limit"
 
 export const dynamic = "force-dynamic"
+export const maxDuration = 60
 
 async function settings(): Promise<Settings> {
   const p = await getPricing()
@@ -22,7 +28,10 @@ export async function GET(request: Request) {
   if (isResponse(user)) return user
   const orgId = new URL(request.url).searchParams.get("orgId") ?? ""
   const r = await getDashboard(orgStore, { userId: user.id }, orgId, await settings())
-  return r.ok ? json(r) : failure(r)
+  if (!r.ok) return failure(r)
+  // Groups of the directory (empty until supabase/org-directory.sql has been run).
+  const groups = can(r.role, "org.view") ? await directoryStore.listGroups(orgId).catch(() => []) : []
+  return json({ ...r, groups })
 }
 
 // One endpoint, several actions. Each action re-checks the caller's own membership inside lib/billing/org-actions.
@@ -67,6 +76,49 @@ export async function POST(request: Request) {
         created: r.created.map((c) => ({ email: c.email, emailed: emailed[c.email] === true, link: `${origin}/account/join?token=${encodeURIComponent(c.token)}` })),
         skipped: r.skipped,
       })
+    }
+    case "groupCreate": {
+      const r = await createGroup(orgStore, directoryStore, actor, str(body.orgId), body.name)
+      return r.ok ? json({ ok: true, id: r.id }) : failure(r)
+    }
+    case "groupRename": {
+      const r = await renameGroup(orgStore, directoryStore, actor, str(body.orgId), str(body.groupId), body.name)
+      return r.ok ? json({ ok: true }) : failure(r)
+    }
+    case "groupDelete": {
+      const r = await deleteGroup(orgStore, directoryStore, actor, str(body.orgId), str(body.groupId))
+      return r.ok ? json({ ok: true }) : failure(r)
+    }
+    case "setGroup": {
+      const r = await setMemberGroup(orgStore, directoryStore, actor, str(body.orgId), str(body.userId), str(body.groupId) || null)
+      return r.ok ? json({ ok: true }) : failure(r)
+    }
+    case "setDisabled": {
+      const r = await setMemberDisabled(orgStore, directoryStore, actor, str(body.orgId), str(body.userId), body.disabled === true)
+      return r.ok ? json({ ok: true }) : failure(r)
+    }
+    case "addPeople": {
+      // Creates accounts for people who do not have one yet (one person, or a pasted spreadsheet) and emails each a link to choose a password.
+      if (!allowSubmission(`dir-add:${user.id}`) || !allowSubmission(`dir-add-ip:${clientKey(request)}`)) return problem("Too many attempts. Please try again later.", 429)
+      let rows: PersonRow[] = Array.isArray(body.rows) ? (body.rows as PersonRow[]).slice(0, 200) : []
+      if (typeof body.csv === "string") {
+        const parsed = parsePeopleCsv(body.csv.slice(0, 200_000))
+        if (parsed.error) return problem(parsed.error, 400)
+        rows = parsed.rows
+      }
+      const org = await orgStore.getOrg(str(body.orgId))
+      const r = await addPeople(orgStore, directoryStore, accountServiceFor(org?.market === "intl" ? "intl" : "ng"), actor, str(body.orgId), { rows, allSpecialties: body.allSpecialties !== false, specialties: body.specialties, defaultGroupId: str(body.groupId) || null }, s)
+      if (!r.ok) return failure(r)
+      const base = publicBaseUrl(new URL(request.url).origin)
+      const emailed = await emailNewPeople({ orgName: org?.name ?? "", adminName: user.email, baseUrl: base, people: r.created })
+      return json({ emailConfigured: emailConfigured(), results: r.results.map((x) => ({ ...x, emailed: x.status === "created" ? emailed[x.email] === true : undefined })) })
+    }
+    case "resetMemberPassword": {
+      if (!allowSubmission(`dir-reset:${user.id}`)) return problem("Too many attempts. Please try again later.", 429)
+      const a = await authoriseMemberPasswordReset(orgStore, actor, str(body.orgId), str(body.userId))
+      if (!a.ok) return failure(a)
+      const outcome = await requestPasswordReset(a.email, publicBaseUrl(new URL(request.url).origin), undefined, { adminAction: true })
+      return outcome === "sent" ? json({ ok: true, emailedTo: a.email }) : problem("The email could not be sent right now. Please try again in a few minutes.", 503)
     }
     case "revoke": {
       const r = await revokeInvitation(orgStore, actor, str(body.orgId), str(body.inviteId))

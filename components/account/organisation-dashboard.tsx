@@ -8,9 +8,10 @@ import { confirmDialog, type ConfirmOptions } from "@/components/ui/app-dialogs"
 import { api } from "@/lib/billing/client"
 import { SPECIALTIES, SPECIALTY_LABELS, type Specialty } from "@/lib/billing/config"
 import { PlanPicker } from "./plan-picker"
+import { OrgDirectory, type Group } from "./org-directory"
 import { useAccountSession } from "@/lib/billing/use-account-session"
 
-type Member = { userId: string; email: string; fullName: string; role: "owner" | "admin" | "staff"; allSpecialties: boolean; specialties: Specialty[] }
+type Member = { userId: string; email: string; fullName: string; role: "owner" | "admin" | "staff"; allSpecialties: boolean; specialties: Specialty[]; groupId?: string | null; disabled?: boolean; managed?: boolean }
 type Invite = { id: string; email: string; role: string; allSpecialties: boolean; specialties: Specialty[]; expiresAt: string }
 type Dash = {
   org: { id: string; name: string; orgType: string; managedStatus: string; suspended: boolean }
@@ -18,6 +19,7 @@ type Dash = {
   subscriptionStatus: string
   plan: { plan: "specialty" | "all_access"; specialties: Specialty[]; currentPeriodEnd: string | null } | null
   members: Member[]
+  groups?: Group[]
   invitations: Invite[]
   seats: { used: number; available: number; seats: number; label: string }
 }
@@ -28,6 +30,7 @@ export function OrganisationDashboard({ orgId }: { orgId: string }) {
   const session = useAccountSession()
   const [d, setD] = useState<Dash | null | undefined>(undefined)
   const [error, setError] = useState("")
+  const [notice, setNotice] = useState("")
   const [links, setLinks] = useState<Array<{ email: string; link: string; emailed?: boolean }>>([])
   const [skipped, setSkipped] = useState<Array<{ email: string; reason: string }>>([])
   const [invite, setInvite] = useState({ emails: "", role: "staff", all: true, specialties: [] as Specialty[] })
@@ -42,7 +45,7 @@ export function OrganisationDashboard({ orgId }: { orgId: string }) {
 
   const act = async (body: Record<string, unknown>, ask?: ConfirmOptions) => {
     if (ask && !(await confirmDialog(ask))) return null
-    setError("")
+    setError(""); setNotice("")
     const r = await api<any>("/api/billing/org", { orgId, ...body })
     if (!r.ok) setError(r.error)
     else await load()
@@ -77,22 +80,34 @@ export function OrganisationDashboard({ orgId }: { orgId: string }) {
         {d.subscriptionStatus === "grace" && <p role="status" className="mt-2 rounded-md border border-amber-500/50 p-2 text-sm">Your subscription has ended. Access continues for a short grace period. Renew to keep it.</p>}
       </header>
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      {notice && <p role="status" className="text-sm">{notice}</p>}
 
       <section className="space-y-3">
         <h2 className="font-medium">{isManager ? "Members" : "Your access"}</h2>
         <div className="overflow-x-auto rounded-lg border">
           <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-left"><tr><th className="p-2">Name</th><th className="p-2">Role</th><th className="p-2">Specialties</th>{isManager && <th className="p-2" />}</tr></thead>
+            <thead className="bg-muted/50 text-left"><tr><th className="p-2">Name</th><th className="p-2">Role</th><th className="p-2">Specialties</th>{isManager && <th className="p-2">Group</th>}{isManager && <th className="p-2" />}</tr></thead>
             <tbody>
               {d.members.map((m) => (
                 <tr key={m.userId} className="border-t align-top">
-                  <td className="p-2">{m.fullName || m.email || "—"}<span className="block text-xs text-muted-foreground">{m.email}</span></td>
+                  <td className="p-2">{m.fullName || m.email || "—"}{m.disabled && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-900">Disabled</span>}<span className="block text-xs text-muted-foreground">{m.email}</span></td>
                   <td className="p-2">{m.role}</td>
                   <td className="p-2">{m.allSpecialties ? "Everything the plan covers" : m.specialties.map((s) => SPECIALTY_LABELS[s]).join(", ") || "None"}</td>
+                  {isManager && (
+                    <td className="p-2">
+                      {manages(d.role, m.role) ? (
+                        <select aria-label={`Group of ${m.fullName || m.email}`} className="rounded-md border bg-background px-2 py-1 text-xs" value={m.groupId ?? ""} onChange={(e) => act({ action: "setGroup", userId: m.userId, groupId: e.target.value })}>
+                          <option value="">No group</option>{(d.groups ?? []).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                        </select>
+                      ) : (d.groups ?? []).find((g) => g.id === m.groupId)?.name ?? "—"}
+                    </td>
+                  )}
                   {isManager && (
                     <td className="p-2 space-x-3 whitespace-nowrap">
                       {manages(d.role, m.role) && (
                         <>
+                          <button className="underline" onClick={() => act({ action: "setDisabled", userId: m.userId, disabled: !m.disabled }, m.disabled ? undefined : { title: `Disable ${m.fullName || m.email}?`, description: "They lose the access this organisation gives them until you enable them again. They keep their seat.", confirmLabel: "Disable", destructive: true })}>{m.disabled ? "Enable" : "Disable"}</button>
+                          {m.managed && <button className="underline" onClick={async () => { const r = await act({ action: "resetMemberPassword", userId: m.userId }, { title: `Email ${m.email} a password link?`, description: "They get an email to choose a new password. You never see their password.", confirmLabel: "Send email" }); if (r?.ok) setNotice(`Password email sent to ${m.email}.`) }}>Send password email</button>}
                           <button className="underline" onClick={() => act({ action: "setSpecialties", userId: m.userId, allSpecialties: !m.allSpecialties, specialties: m.allSpecialties ? assignable.slice(0, 1) : [] })}>
                             {m.allSpecialties ? "Limit access" : "Give full plan access"}
                           </button>
@@ -108,6 +123,8 @@ export function OrganisationDashboard({ orgId }: { orgId: string }) {
         </div>
         {d.role !== "owner" && <Button variant="outline" onClick={async () => { const r = await act({ action: "leave" }, { title: "Leave this organisation?", description: "You will lose the access it gave you. An administrator can invite you again.", confirmLabel: "Leave", destructive: true }); if (r?.ok) window.location.href = "/account" }}>Leave organisation</Button>}
       </section>
+
+      {isManager && active && <OrgDirectory role={d.role} groups={d.groups ?? []} act={act} />}
 
       {isManager && (
         <section className="space-y-3">
