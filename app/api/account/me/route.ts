@@ -1,6 +1,8 @@
 import { effectiveStatus } from "@/lib/billing/lifecycle"
 import { resolveEntitlements } from "@/lib/billing/entitlements"
 import { detectMarket, guard, isResponse, json, requireUser } from "@/lib/billing/route-kit"
+import { activePersonalTrial, getLaunchStatus } from "@/lib/billing/launch-store"
+import { db, uuid } from "@/lib/billing/db"
 import { getPricing, getSubscriptionFor, getUserMarket, listUserOrganisations, loadEntitlementInputs } from "@/lib/billing/store"
 
 export const dynamic = "force-dynamic"
@@ -15,10 +17,17 @@ export async function GET(request: Request) {
   const [pricing, inputs, own, organisations, market] = await Promise.all([getPricing(), loadEntitlementInputs(user.id), getSubscriptionFor({ userId: user.id }), listUserOrganisations(user.id), getUserMarket(user.id)])
   const now = Date.now()
   const entitlements = resolveEntitlements({ ...inputs, now, graceDays: pricing.graceDays })
+  const launch = await getLaunchStatus(now)
+  const profile = await db.select("billing_profiles", `select=full_name,account_type,background,role&user_id=eq.${uuid(user.id)}`).then((r) => r[0]).catch(() => undefined)
+  // Free period shown on the account page: the launch free period for everyone, or a new user's own one.
+  const trialEndsAt = launch.trial ? launch.freeUntil : launch.enforced && !entitlements.all ? await activePersonalTrial(user.id, launch, now) : null
   return json({
     user,
     market: market ?? detectMarket(request),
-    entitlements,
+    entitlements: trialEndsAt ? { ...entitlements, all: true } : entitlements,
+    payments: launch.switchedOn,
+    profile: profile ? { fullName: String(profile.full_name ?? ""), accountType: profile.account_type === "enterprise" ? "enterprise" : "individual", background: profile.background ?? null, role: profile.role ?? null } : null,
+    trialEndsAt,
     subscription: own ? { plan: own.plan, specialties: own.specialties, status: effectiveStatus(own, now, pricing.graceDays), currentPeriodEnd: own.currentPeriodEnd, cancelAtPeriodEnd: own.cancelAtPeriodEnd } : null,
     organisations,
   })

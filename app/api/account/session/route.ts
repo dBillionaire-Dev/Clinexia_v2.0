@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { billingEnabled, premiumEnforced } from "@/lib/billing/config"
+import { billingEnabled } from "@/lib/billing/config"
+import { activePersonalTrial, getLaunchStatus } from "@/lib/billing/launch-store"
 import { resolveEntitlements } from "@/lib/billing/entitlements"
 import { currentUser } from "@/lib/billing/session"
 import { getPricing, loadEntitlementInputs } from "@/lib/billing/store"
@@ -11,14 +12,19 @@ const reply = (data: Record<string, unknown>) => NextResponse.json(data, { heade
 // Light status for the app shell (navbar icon, free/premium badges, guest allowance). Always 200 so signed-out visitors cause no errors.
 export async function GET() {
   if (!billingEnabled()) return reply({ enabled: false, enforced: false, signedIn: false })
-  const enforced = premiumEnforced()
+  const launch = await getLaunchStatus()
+  const enforced = launch.enforced
+  const payments = launch.switchedOn // false = payments are hidden: no prices, plans or checkout are shown
+  const trial = launch.trial ? { trial: true, trialEndsAt: launch.freeUntil } : {}
   const user = await currentUser().catch(() => null)
-  if (!user) return reply({ enabled: true, enforced, signedIn: false })
+  if (!user) return reply({ enabled: true, enforced, payments, signedIn: false, ...trial })
   try {
     const [pricing, inputs] = await Promise.all([getPricing(), loadEntitlementInputs(user.id)])
     const e = resolveEntitlements({ ...inputs, now: Date.now(), graceDays: pricing.graceDays })
-    return reply({ enabled: true, enforced, signedIn: true, email: user.email, entitlements: { all: e.all, specialties: e.specialties } })
+    // A person who joined after payments were introduced has full access during their own free period.
+    const own = enforced && !e.all ? await activePersonalTrial(user.id, launch) : null
+    return reply({ enabled: true, enforced, payments, signedIn: true, email: user.email, avatarUrl: user.avatarUrl ?? null, entitlements: { all: e.all || own !== null, specialties: e.specialties }, ...(own ? { trial: true, trialEndsAt: own } : trial) })
   } catch {
-    return reply({ enabled: true, enforced, signedIn: true, email: user.email })
+    return reply({ enabled: true, enforced, payments, signedIn: true, email: user.email, avatarUrl: user.avatarUrl ?? null, ...trial })
   }
 }

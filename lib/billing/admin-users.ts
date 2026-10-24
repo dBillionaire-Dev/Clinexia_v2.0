@@ -37,6 +37,32 @@ export async function getAuthUser(id: string): Promise<AuthUser | null> {
   return shape(await res.json())
 }
 
+/**
+ * A one-time password-reset token for this email, made by Supabase WITHOUT sending Supabase's own email, so Clinexia can send the
+ * message itself (through Resend). Null when there is no such account. The token is later traded in with verifyRecovery().
+ */
+export async function generateRecoveryToken(email: string): Promise<{ userId: string; tokenHash: string } | null> {
+  const { base, headers } = conn()
+  const res = await fetch(`${base}/generate_link`, { method: "POST", headers, body: JSON.stringify({ type: "recovery", email }), cache: "no-store" })
+  if (!res.ok) return null // unknown address (or Supabase refused): the caller answers the same either way
+  const j = (await res.json().catch(() => null)) as any
+  const tokenHash = j?.hashed_token ?? j?.properties?.hashed_token
+  const userId = j?.id ?? j?.user?.id
+  return typeof tokenHash === "string" && typeof userId === "string" ? { userId, tokenHash } : null
+}
+
+/** Changes some of a person's profile fields kept by Supabase (name, photo). A null value removes that field; the rest are left as they are. */
+export async function setUserMetadata(id: string, patch: Record<string, string | null>): Promise<void> {
+  const { base, headers } = conn()
+  const url = `${base}/users/${uuid(id)}`
+  const cur = await fetch(url, { headers, cache: "no-store" })
+  if (!cur.ok) throw new Error(`Supabase get user failed (${cur.status})`)
+  const meta = { ...(((await cur.json()) as any)?.user_metadata ?? {}) } as Record<string, unknown>
+  for (const [k, v] of Object.entries(patch)) { if (v === null) delete meta[k]; else meta[k] = v }
+  const res = await fetch(url, { method: "PUT", headers, body: JSON.stringify({ user_metadata: meta }), cache: "no-store" })
+  if (!res.ok) throw new Error(`Supabase update user failed (${res.status})`)
+}
+
 export async function deleteAuthUser(id: string): Promise<void> {
   const { base, headers } = conn()
   const res = await fetch(`${base}/users/${uuid(id)}`, { method: "DELETE", headers })

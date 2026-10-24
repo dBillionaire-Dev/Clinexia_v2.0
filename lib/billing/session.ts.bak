@@ -51,6 +51,27 @@ export async function resendConfirmation(email: string, redirectTo?: string): Pr
   await call(redirectTo ? `resend?redirect_to=${encodeURIComponent(redirectTo)}` : "resend", { body: { type: "signup", email } })
 }
 
+export type ResetFailure = "invalid" | "same" | "weak" | "error"
+
+/**
+ * Finishes a password reset: trades the one-time token for a short session, sets the new password with it, then signs that session
+ * and every other session of the account out (a reset usually means someone else may have had access).
+ */
+export async function completePasswordReset(tokenHash: string, password: string): Promise<{ ok: true; email: string } | { ok: false; reason: ResetFailure }> {
+  const v = await call("verify", { body: { type: "recovery", token_hash: tokenHash } })
+  if (!v.ok || typeof v.json?.access_token !== "string") return { ok: false, reason: v.status >= 500 ? "error" : "invalid" }
+  const token = v.json.access_token as string
+  const email = typeof v.json?.user?.email === "string" ? (v.json.user.email as string) : ""
+  const put = await call("user", { method: "PUT", token, body: { password } })
+  if (!put.ok) {
+    const code = String(put.json?.error_code ?? put.json?.code ?? "")
+    await call("logout", { token, body: {} }).catch(() => undefined)
+    return { ok: false, reason: code === "same_password" ? "same" : code === "weak_password" ? "weak" : "error" }
+  }
+  await call("logout?scope=global", { token, body: {} }).catch(() => undefined)
+  return { ok: true, email }
+}
+
 export async function refreshSession(refreshToken: string): Promise<Session | null> {
   const r = await call("token?grant_type=refresh_token", { body: { refresh_token: refreshToken } })
   return r.ok && r.json?.access_token ? (r.json as Session) : null

@@ -342,7 +342,10 @@ Clinexia works without an account. Accounts add premium plans, organisations, an
 | `SUPABASE_ANON_KEY` | sign-in and registration |
 | `PAYSTACK_SECRET_KEY` | payments |
 | `FCM_SERVICE_ACCOUNT_JSON` | phone notifications |
-| `RESEND_API_KEY`, `BILLING_FROM_EMAIL` | emailed account notices (optional) |
+| `RESEND_API_KEY`, `BILLING_FROM_EMAIL` | emails: invitations, payment receipts, plan-ending reminders, account notices (optional). `BILLING_FROM_EMAIL` like `Clinexia <billing@yourdomain>` on a domain verified in Resend |
+| `BILLING_REPLY_TO_EMAIL` | where replies go (optional) |
+| `CRON_SECRET` | any long random string; protects the daily reminder job in `vercel.json` |
+| `PLAN_REMINDER_DAYS` | days before a plan ends that the reminder goes out (optional, default 3) |
 | `BILLING_ENFORCE_PREMIUM=true` | turn premium locking on (default off) |
 | `BILLING_ENABLED=false` | switch accounts off completely |
 | `MOBILE_ALLOWED_ORIGINS` | extra origins allowed to call the account APIs (testing) |

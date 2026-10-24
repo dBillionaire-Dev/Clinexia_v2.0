@@ -3,6 +3,7 @@ import { can } from "@/lib/billing/roles"
 import { clientSource, detectMarket, guard, isResponse, json, problem, readJson, requireUser } from "@/lib/billing/route-kit"
 import type { Market } from "@/lib/billing/config"
 import { createPaystack, makeReference } from "@/lib/billing/paystack"
+import { getLaunchStatus } from "@/lib/billing/launch-store"
 import { createOrder, ensureSubscription, getPricing, getUserMarket, orgStore, recordAudit, seatCounts } from "@/lib/billing/store"
 
 export const dynamic = "force-dynamic"
@@ -13,6 +14,7 @@ export async function POST(request: Request) {
   if (blocked) return blocked
   const user = await requireUser()
   if (isResponse(user)) return user
+  if (!(await getLaunchStatus()).switchedOn) return problem("Payments are not open yet.", 403)
   const secret = process.env.PAYSTACK_SECRET_KEY
   if (!secret) return problem("Payments are not set up yet.", 503)
 

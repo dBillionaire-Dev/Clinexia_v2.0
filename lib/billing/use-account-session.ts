@@ -11,12 +11,15 @@ export interface AccountSession {
   loading: boolean
   enabled: boolean
   enforced: boolean
+  /** Payments are introduced: prices, plans and checkout may be shown. False = hidden. */
+  payments: boolean
   signedIn: boolean
   email?: string
+  avatarUrl?: string
   entitlements?: { all: boolean; specialties: Specialty[] }
 }
 
-const LOADING: AccountSession = { loading: true, enabled: false, enforced: false, signedIn: false }
+const LOADING: AccountSession = { loading: true, enabled: false, enforced: false, payments: false, signedIn: false }
 let snapshot: AccountSession = LOADING
 let started = false
 const listeners = new Set<() => void>()
@@ -38,7 +41,7 @@ export async function refreshAccountSession(): Promise<void> {
     const res = await fetch("/api/account/session", { cache: "no-store" })
     if (!res.ok) throw new Error("status")
     const j = await res.json()
-    snapshot = { loading: false, enabled: j.enabled === true, enforced: j.enforced === true, signedIn: j.signedIn === true, email: typeof j.email === "string" ? j.email : undefined, entitlements: j.entitlements }
+    snapshot = { loading: false, enabled: j.enabled === true, enforced: j.enforced === true, payments: j.payments === true, signedIn: j.signedIn === true, email: typeof j.email === "string" ? j.email : undefined, avatarUrl: typeof j.avatarUrl === "string" ? j.avatarUrl : undefined, entitlements: j.entitlements }
     try { writeSessionState(window.localStorage, { enforced: snapshot.enforced, signedIn: snapshot.signedIn }) } catch { /* ignore */ }
     if (snapshot.signedIn && snapshot.email) void linkThisDevice(snapshot.email)
   } catch {
@@ -61,7 +64,7 @@ export function useAccountSession(): AccountSession {
     started = true
     try {
       const last = readSessionState(window.localStorage)
-      if (last) { snapshot = { loading: true, enabled: true, enforced: last.enforced, signedIn: last.signedIn }; emit() }
+      if (last) { snapshot = { loading: true, enabled: true, enforced: last.enforced, payments: false, signedIn: last.signedIn }; emit() }
     } catch { /* ignore */ }
     void refreshAccountSession()
     // Stay in step with sign-in or sign-out done anywhere else (another tab, the account page, an expired cookie).

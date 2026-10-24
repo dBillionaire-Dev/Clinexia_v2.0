@@ -8,6 +8,7 @@ import { confirmDialog, type ConfirmOptions } from "@/components/ui/app-dialogs"
 import { api } from "@/lib/billing/client"
 import { SPECIALTIES, SPECIALTY_LABELS, type Specialty } from "@/lib/billing/config"
 import { PlanPicker } from "./plan-picker"
+import { useAccountSession } from "@/lib/billing/use-account-session"
 
 type Member = { userId: string; email: string; fullName: string; role: "owner" | "admin" | "staff"; allSpecialties: boolean; specialties: Specialty[] }
 type Invite = { id: string; email: string; role: string; allSpecialties: boolean; specialties: Specialty[]; expiresAt: string }
@@ -24,6 +25,7 @@ type Dash = {
 const manages = (actor: Dash["role"], target: Member["role"]) => target !== "owner" && (actor === "owner" || (actor === "admin" && target === "staff"))
 
 export function OrganisationDashboard({ orgId }: { orgId: string }) {
+  const session = useAccountSession()
   const [d, setD] = useState<Dash | null | undefined>(undefined)
   const [error, setError] = useState("")
   const [links, setLinks] = useState<Array<{ email: string; link: string; emailed?: boolean }>>([])
@@ -151,7 +153,7 @@ export function OrganisationDashboard({ orgId }: { orgId: string }) {
       {d.role === "owner" && (
         <section className="space-y-3">
           <h2 className="font-medium">Plan and billing</h2>
-          <PlanPicker kind="enterprise" orgId={orgId} minSeats={Math.max(1, d.seats.used)} />
+          {session.payments && <PlanPicker kind="enterprise" orgId={orgId} minSeats={Math.max(1, d.seats.used)} />}
           <div className="rounded-lg border p-3 text-sm space-y-2">
             <p className="font-medium">Centrally managed organisations</p>
             <p className="text-muted-foreground">If your organisation manages staff centrally (for example with Microsoft Entra ID), you can ask Clinexia to review it for a discount. It applies only after Clinexia verifies it. Single sign-in is not available yet.</p>

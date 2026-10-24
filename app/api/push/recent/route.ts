@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic"
 export async function GET() {
   const user = await currentUser().catch(() => null)
   try {
-    return NextResponse.json({ messages: await listRecentMessages(Boolean(user)) }, { headers: { "Cache-Control": "no-store" } })
+    return NextResponse.json({ messages: await listRecentMessages(Boolean(user), 7, 5, user?.id) }, { headers: { "Cache-Control": "no-store" } })
   } catch {
     return NextResponse.json({ messages: [] }, { headers: { "Cache-Control": "no-store" } })
   }
