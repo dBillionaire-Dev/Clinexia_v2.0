@@ -25,7 +25,7 @@ export function ForgotPassword({ initialEmail = "", onBack }: { initialEmail?: s
     return (
       <div className="space-y-4">
         <h1 className="text-2xl font-semibold">Check your email</h1>
-        <p role="status" className="text-sm">If an account exists for <strong>{email.trim().toLowerCase()}</strong>, we have sent a link to choose a new password. It can take a few minutes; check your spam folder too.</p>
+        <p role="status" className="text-sm">We have sent a link to choose a new password to <strong>{email.trim().toLowerCase()}</strong>. It can take a few minutes; check your spam folder too.</p>
         <button type="button" className="text-sm underline" onClick={onBack}>Back to sign in</button>
       </div>
     )

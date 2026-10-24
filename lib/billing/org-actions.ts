@@ -10,7 +10,7 @@ import { hashInviteToken, newInviteToken, normalizeEmail, parseEmailList } from 
 import { seatUsage } from "./seats"
 
 export interface OrgRecord { id: string; name: string; orgType: string; market?: Market; seats: number; suspended: boolean; managedStatus: "none" | "requested" | "verified" | "rejected"; plan: PlanRecord | null }
-export interface MemberRecord { userId: string; email: string; fullName: string; role: OrgRole; allSpecialties: boolean; specialties: Specialty[]; joinedAt: string }
+export interface MemberRecord { userId: string; email: string; fullName: string; role: OrgRole; allSpecialties: boolean; specialties: Specialty[]; joinedAt: string; groupId?: string | null; disabled?: boolean; managed?: boolean }
 export interface InviteRecord { id: string; email: string; role: OrgRole; allSpecialties: boolean; specialties: Specialty[]; expiresAt: string }
 
 export type CreateInviteResult = { ok: true; invite: InviteRecord } | { ok: false; reason: "no_capacity" | "duplicate_invite" | "already_member" }
@@ -41,7 +41,7 @@ const fail = (code: Failure["code"], message: string): Failure => ({ ok: false, 
 
 async function load(store: OrgStore, orgId: string, actor: Actor) {
   const [org, me] = await Promise.all([store.getOrg(orgId), store.getMember(orgId, actor.userId)])
-  if (!org || !me) return null
+  if (!org || !me || me.disabled) return null // a disabled member has no say in the organisation
   return { org, me }
 }
 

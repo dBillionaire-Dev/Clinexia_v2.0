@@ -1,4 +1,5 @@
 // Administrator access to the sign-in accounts held by Supabase Auth (service role). Server only.
+import { randomBytes } from "node:crypto"
 import { uuid } from "./db"
 
 export interface AuthUser { id: string; email: string; createdAt: string | null; lastSignInAt: string | null; confirmed: boolean }
@@ -61,6 +62,17 @@ export async function setUserMetadata(id: string, patch: Record<string, string |
   for (const [k, v] of Object.entries(patch)) { if (v === null) delete meta[k]; else meta[k] = v }
   const res = await fetch(url, { method: "PUT", headers, body: JSON.stringify({ user_metadata: meta }), cache: "no-store" })
   if (!res.ok) throw new Error(`Supabase update user failed (${res.status})`)
+}
+
+/** Creates a confirmed account for someone else (an organisation adding its staff). The person chooses their own password through a reset link. */
+export async function createConfirmedUser(email: string, fullName: string): Promise<{ ok: true; userId: string } | { ok: false; reason: "exists" | "error" }> {
+  const { base, headers } = conn()
+  const password = randomBytes(24).toString("base64url") // nobody ever sees this; it is replaced when the person sets their own
+  const res = await fetch(`${base}/users`, { method: "POST", headers, body: JSON.stringify({ email, password, email_confirm: true, user_metadata: { full_name: fullName } }), cache: "no-store" })
+  const j = (await res.json().catch(() => null)) as any
+  if (res.ok && typeof j?.id === "string") return { ok: true, userId: j.id }
+  const code = String(j?.error_code ?? j?.code ?? "")
+  return { ok: false, reason: code === "email_exists" || code === "user_already_exists" || res.status === 422 ? "exists" : "error" }
 }
 
 export async function deleteAuthUser(id: string): Promise<void> {

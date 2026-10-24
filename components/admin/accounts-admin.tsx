@@ -77,6 +77,37 @@ function LaunchPanel({ launch, onChanged }: { launch: LaunchStatus; onChanged: (
   )
 }
 
+// ----- reset a person's password: email them a link, or make a link to hand over -----
+function PasswordBox({ userId, email }: { userId: string; email: string }) {
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState("")
+  const [link, setLink] = useState("")
+  async function run(mode: "email" | "link") {
+    const ok = await confirmDialog(mode === "email"
+      ? { title: `Email a password reset link to ${email}?`, description: "They get an email with a one-use link to choose a new password. Their current password keeps working until they use it.", confirmLabel: "Send email" }
+      : { title: "Create a reset link to share?", description: "Anyone who opens this link can set a new password for this account, once. Give it only to the account owner, by a channel you trust.", confirmLabel: "Create link" })
+    if (!ok) return
+    setBusy(true); setMsg(""); setLink("")
+    const r = await api<{ link?: string; emailedTo?: string }>("/api/admin/accounts", { action: "resetPassword", userId, mode })
+    setBusy(false)
+    if (!r.ok) return setMsg(r.error)
+    if (r.data.link) { setLink(r.data.link); setMsg("Link created. It works once and expires soon.") } else setMsg(`Reset email sent to ${r.data.emailedTo}.`)
+  }
+  return (
+    <div className="space-y-2 rounded-md border p-3">
+      <p className="font-medium">Reset password</p>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button variant="outline" disabled={busy} onClick={() => run("email")}>Email a reset link</Button>
+        <Button variant="outline" disabled={busy} onClick={() => run("link")}>Create a link to share</Button>
+        {busy && <Loader2 className="h-4 w-4 animate-spin" aria-label="Working" />}
+      </div>
+      {msg && <p role="status" className="text-xs">{msg}</p>}
+      {link && <input readOnly className="w-full rounded-md border bg-background px-2 py-1 text-xs" value={link} onFocus={(e) => e.currentTarget.select()} aria-label="Reset link" />}
+      <p className="text-xs text-muted-foreground">Recorded in the audit trail. Changing the password signs the person out everywhere.</p>
+    </div>
+  )
+}
+
 // ----- a private message to one person: in their app and account page, on their phone, and by email -----
 function MessageBox({ userId, email }: { userId: string; email: string }) {
   const [title, setTitle] = useState("")
@@ -272,6 +303,7 @@ export function AccountsAdmin() {
               <div className="flex justify-between"><p className="font-medium">{detail.user.email}</p><button className="underline" onClick={() => setDetail(null)}>Close</button></div>
               <p>Status: {detail.status.status}{detail.status.reason ? ` (${detail.status.reason})` : ""}</p>
               <p>Organisations: {detail.memberships.length ? detail.memberships.map((m) => `${m.name} (${m.role})`).join(", ") : "none"}</p>
+              <PasswordBox key={`pw-${detailId}`} userId={detailId} email={detail.user.email} />
               <MessageBox key={detailId} userId={detailId} email={detail.user.email} />
               <p className="font-medium">Devices linked to this account ({detail.devices.length})</p>
               {detail.devices.length === 0 ? <p className="text-xs text-muted-foreground">None yet. A device links when this person registers or signs in on it. Devices used before they registered are included from then on.</p> : (

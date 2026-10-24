@@ -4,7 +4,7 @@ import { DEFAULT_PRICING, SPECIALTIES, parsePricingConfig, type Currency, type M
 import { deleteAuthUser, getAuthUser, listAuthUsers } from "./admin-users"
 import { canDeleteUser } from "./admin-rules"
 import { addMonthsUtc } from "./lifecycle"
-import { loadDeviceHistory } from "./devices"
+import { forgetUserDevices, loadDeviceHistory } from "./devices"
 import { summariseHistory, type HistoryEvent } from "./history"
 import type { MembershipContext, PlanRecord } from "./entitlements"
 import type { AcceptResult, CreateInviteResult, InviteRecord, MemberRecord, OrgRecord, OrgStore } from "./org-actions"
@@ -342,6 +342,7 @@ export async function deleteUserCompletely(userId: string): Promise<{ ok: true }
   const verdict = canDeleteUser({ ownedOrganisations: owned.length })
   if (!verdict.ok) return verdict
   await db.remove("billing_orders", `payer_user_id=eq.${id}&status=eq.pending`) // an unpaid checkout must not outlive its owner
+  await forgetUserDevices(id) // their name must not stay on the device records
   await deleteAuthUser(id)
   return { ok: true }
 }

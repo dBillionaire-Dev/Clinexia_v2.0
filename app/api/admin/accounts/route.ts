@@ -13,6 +13,7 @@ import { composeNotice, sendEmail, type NoticeKind } from "@/lib/billing/notify"
 import { sendAdminMessage } from "@/lib/billing/admin-message"
 import { publicBaseUrl } from "@/lib/billing/email-flows"
 import { validateUserMessage } from "@/lib/push/validate"
+import { createResetLink, requestPasswordReset } from "@/lib/billing/password-reset"
 import {
   deleteOrganisationCompletely, deleteUserCompletely, getOrgOwner, loadAdminUserDetail, loadAdminUsers, recordAudit, setOrgMarket, setSuspended, setUserMarket, setUserPlan, setUserStatus,
 } from "@/lib/billing/store"
@@ -142,6 +143,23 @@ export async function POST(request: Request) {
       if (!ok) return out({ error: link ? "Could not link that device. Has supabase/billing-link.sql been run?" : "That device was not linked to this account." }, link ? 500 : 404)
       await recordAudit({ actorKind: "platform_admin", actorUserId: userId, action: link ? "device.linked" : "device.unlinked", detail: { anonymousId: body.anonymousId } })
       return out({ ok: true })
+    }
+    case "resetPassword": {
+      // Admin resets a person's password: either emails them a one-use reset link, or returns the link to hand over yourself.
+      if (!isUuid(userId)) return out({ error: "Invalid user." }, 400)
+      const target = await getAuthUser(userId)
+      if (!target?.email) return out({ error: "User not found." }, 404)
+      const base = publicBaseUrl(new URL(request.url).origin)
+      if (body.mode === "link") {
+        const link = await createResetLink(target.email, base)
+        if (!link) return out({ error: "Could not create a reset link for this account." }, 502)
+        await recordAudit({ actorKind: "platform_admin", actorUserId: userId, action: "user.password_reset_link", detail: { mode: "link" } })
+        return out({ ok: true, link })
+      }
+      const outcome = await requestPasswordReset(target.email, base, undefined, { adminAction: true })
+      await recordAudit({ actorKind: "platform_admin", actorUserId: userId, action: "user.password_reset_email", detail: { outcome } })
+      if (outcome !== "sent") return out({ error: outcome === "no_account" ? "This account has no email to reset." : "The email could not be sent. Check the Resend settings, or create a link to share instead." }, 502)
+      return out({ ok: true, emailedTo: target.email })
     }
     case "sendMessage": {
       // A private message to one person: appears in their app and account page, goes to their phones, and to their email.

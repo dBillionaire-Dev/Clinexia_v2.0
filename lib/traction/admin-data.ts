@@ -2,6 +2,7 @@ import { createRest } from "./rest.mjs"
 import { addDays, addMonths, lagosDay, monthKey } from "./dates.mjs"
 import { summarizeDownloads, computeDailyDeltas } from "./github.mjs"
 import { computeActiveWindows, computeRetention, computeReturningPercent } from "./rollups.mjs"
+import { rebuildRollups } from "./rebuild.mjs"
 
 export type Row = Record<string, any>
 
@@ -34,9 +35,29 @@ function monthsBetween(from: string, to: string): string[] {
 
 const sum = (rows: Row[], key: string) => rows.reduce((s, r) => s + Number(r[key] ?? 0), 0)
 
-export async function loadDashboard(range: Range) {
+const STALE_MS = 10 * 60_000
+
+/**
+ * The dashboard reads summary tables that the nightly job fills. So that new installs and usage show up without waiting for the
+ * night, a visit to the page refreshes the last few days itself when the last refresh is older than ten minutes (or when asked to).
+ * The very first time, everything is built. A failure never blocks the page: it shows the older numbers and says why.
+ */
+async function refreshIfStale(db: ReturnType<typeof rest>, force: boolean): Promise<{ refreshedAt: string | null; error: string | null }> {
+  try {
+    const runs = await db.selectAll("traction_job_runs", "select=job,ran_at&job=eq.rebuild-rollups")
+    const last: string | null = runs[0]?.ran_at ?? null
+    if (!force && last && Date.now() - Date.parse(last) < STALE_MS) return { refreshedAt: last, error: null }
+    await rebuildRollups(db, { sinceDays: last ? 3 : null })
+    return { refreshedAt: new Date().toISOString(), error: null }
+  } catch (e) {
+    return { refreshedAt: null, error: e instanceof Error ? e.message : "Could not refresh the latest numbers." }
+  }
+}
+
+export async function loadDashboard(range: Range, opts: { force?: boolean } = {}) {
   const db = rest()
   const today = lagosDay(Date.now())
+  const refresh = await refreshIfStale(db, opts.force === true)
 
   const [rollups, tools, installs, snapshots, gsc, jobs, monthlyActive, activityRows] = await Promise.all([
     db.selectAll("daily_rollups", `select=date,platform,active_users,new_users,returning_users,sessions,tool_uses&order=date,platform`),
@@ -159,7 +180,9 @@ export async function loadDashboard(range: Range) {
       gscImpressions28: sum(gsc28, "impressions"),
       gscWindow: gscFrom && gscLatest ? { from: gscFrom, to: gscLatest } : null,
       retention,
+      subscriptionRevenue: await loadSubscriptionRevenue().catch(() => null),
     },
+    refresh,
     monthly, topTools, platformSplit,
     topQueries: agg("query"), topPages: agg("page"),
     coverage,
@@ -167,15 +190,46 @@ export async function loadDashboard(range: Range) {
   }
 }
 
+/** Subscription money, counted automatically from paid orders (nothing is typed in). Amounts stay in the currency they were paid in. */
+export async function loadSubscriptionRevenue() {
+  const orders = await rest().selectAll("billing_orders", "select=reference,amount_kobo,currency,paid_at,org_id&status=eq.paid&order=paid_at.desc")
+  const totals: Record<"NGN" | "USD", number> = { NGN: 0, USD: 0 }
+  const byMonth = new Map<string, { month: string; NGN: number; USD: number; payments: number }>()
+  for (const o of orders) {
+    const cur: "NGN" | "USD" = o.currency === "USD" ? "USD" : "NGN"
+    const amount = Number(o.amount_kobo) / 100
+    totals[cur] += amount
+    const month = lagosDay(o.paid_at ?? Date.now()).slice(0, 7)
+    const m = byMonth.get(month) ?? { month, NGN: 0, USD: 0, payments: 0 }
+    m[cur] += amount
+    m.payments += 1
+    byMonth.set(month, m)
+  }
+  return { totals, payments: orders.length, months: [...byMonth.values()].sort((a, b) => (a.month < b.month ? 1 : -1)) }
+}
+
 export async function loadRevenue() {
   const rows = await rest().selectAll("revenue_entries", "select=*&order=date.desc,created_at.desc")
   const bySource: Record<string, number> = { ads: 0, sponsorship: 0, other: 0 }
   for (const r of rows) bySource[r.source] = (bySource[r.source] ?? 0) + Number(r.amount_usd)
-  return { rows, total: Object.values(bySource).reduce((a, b) => a + b, 0), bySource }
+  const subscriptions = await loadSubscriptionRevenue().catch(() => null)
+  return { rows, total: Object.values(bySource).reduce((a, b) => a + b, 0), bySource, subscriptions }
 }
 
 export async function addRevenue(entry: { date: string; source: string; amount: number; notes: string }) {
   await rest().insert("revenue_entries", {
     date: entry.date, source: entry.source, amount_usd: entry.amount, notes: entry.notes || null, entered_manually: true,
   })
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export async function updateRevenue(id: string, entry: { date: string; source: string; amount: number; notes: string }) {
+  if (!UUID.test(id)) throw new Error("Invalid entry.")
+  await rest().update("revenue_entries", `id=eq.${id}`, { date: entry.date, source: entry.source, amount_usd: entry.amount, notes: entry.notes || null })
+}
+
+export async function deleteRevenue(id: string) {
+  if (!UUID.test(id)) throw new Error("Invalid entry.")
+  await rest().delete("revenue_entries", `id=eq.${id}`)
 }

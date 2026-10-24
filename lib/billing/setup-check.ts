@@ -16,6 +16,7 @@ const TABLES: Array<[string, string, string, string]> = [
   ["Campaigns", "Campaigns", "app_campaigns?select=id,platforms&limit=1", "supabase/campaigns.sql"],
   ["Campaigns", "Answers linked to accounts", "app_campaign_responses?select=id,user_id&limit=1", "supabase/campaigns.sql"],
   ["Campaigns", "Reminders that follow the account", "app_campaign_parked?select=user_id&limit=1", "supabase/campaigns.sql"],
+  ["Organisations", "Organisation directory (groups, disabling, accounts created by the organisation)", "billing_org_groups?select=id&limit=1", "supabase/org-directory.sql"],
   ["Messages", "Private messages to users", "push_messages?select=user_id&limit=1", "supabase/user-messages.sql"],
   ["Billing switch", "Switch-on button and free trial", "billing_launch?select=enforce&limit=1", "supabase/billing-launch.sql"],
   ["Emails", "Invitation email tracking", "billing_invitations?select=emailed_at&limit=1", "supabase/email-notifications.sql"],

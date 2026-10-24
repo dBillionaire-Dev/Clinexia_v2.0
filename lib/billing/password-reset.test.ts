@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { generateRecoveryToken } from "./admin-users"
 import { composePasswordChangedEmail, composePasswordResetEmail } from "./emails"
-import { requestPasswordReset, sendPasswordChangedNotice, validNewPassword, validResetToken, type ResetDeps } from "./password-reset"
+import { createResetLink, requestPasswordReset, sendPasswordChangedNotice, validNewPassword, validResetToken, type ResetDeps } from "./password-reset"
 import { completePasswordReset } from "./session"
 
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals() })
@@ -41,10 +41,17 @@ describe("requesting a reset", () => {
     expect(m.to).toBe("a@b.com")
     expect(m.text).toContain(`https://x.test/account/reset?token=${"T".repeat(56)}`)
   })
-  it("sends nothing for an unknown address, a suspended account, or a failing service, and never throws", async () => {
-    const a = deps({ generate: async () => null }); expect(await requestPasswordReset("a@b.com", "https://x.test", a.d)).toBe("none"); expect(a.send).not.toHaveBeenCalled()
-    const b = deps({ isSuspended: async () => true }); expect(await requestPasswordReset("a@b.com", "https://x.test", b.d)).toBe("none"); expect(b.send).not.toHaveBeenCalled()
-    const c = deps({ generate: async () => { throw new Error("down") } }); expect(await requestPasswordReset("a@b.com", "https://x.test", c.d)).toBe("none")
+  it("says exactly why nothing was sent, and never throws", async () => {
+    const a = deps({ generate: async () => null }); expect(await requestPasswordReset("a@b.com", "https://x.test", a.d)).toBe("no_account"); expect(a.send).not.toHaveBeenCalled()
+    const b = deps({ isSuspended: async () => true }); expect(await requestPasswordReset("a@b.com", "https://x.test", b.d)).toBe("suspended"); expect(b.send).not.toHaveBeenCalled()
+    const c = deps({ generate: async () => { throw new Error("down") } }); expect(await requestPasswordReset("a@b.com", "https://x.test", c.d)).toBe("email_failed")
+    const f = deps({ send: vi.fn(async () => "failed" as const) as any }); expect(await requestPasswordReset("a@b.com", "https://x.test", f.d)).toBe("email_failed")
+  })
+  it("an administrator can reset a suspended account, and can get the link to hand over", async () => {
+    const s = deps({ isSuspended: async () => true })
+    expect(await requestPasswordReset("a@b.com", "https://x.test", s.d, { adminAction: true })).toBe("sent")
+    expect(await createResetLink("a@b.com", "https://x.test", { generate: async () => ({ userId: "u", tokenHash: "T".repeat(56) }) })).toBe(`https://x.test/account/reset?token=${"T".repeat(56)}`)
+    expect(await createResetLink("none@b.com", "https://x.test", { generate: async () => null })).toBeNull()
   })
   it("the changed notice is best effort", async () => {
     const send = vi.fn(async () => { throw new Error("x") })
