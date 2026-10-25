@@ -21,24 +21,24 @@ const nextConfig = {
     NEXT_PUBLIC_BUILD_ID: (process.env.VERCEL_DEPLOYMENT_ID || process.env.VERCEL_GIT_COMMIT_SHA || process.env.NEXT_PUBLIC_BUILD_ID || "").slice(0, 60),
   },
   async headers() {
+    const securityHeaders = [
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+      { key: "X-DNS-Prefetch-Control", value: "on" },
+      ...(process.env.NODE_ENV === "production"
+        ? [
+            { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+            { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+            { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+          ]
+        : []),
+    ]
     return [
-      {
-        source: "/(.*)",
-        headers: [
-          { key: "X-Content-Type-Options", value: "nosniff" },
-          ...FRAME_HEADERS,
-          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
-          { key: "X-DNS-Prefetch-Control", value: "on" },
-          ...(process.env.NODE_ENV === "production"
-            ? [
-                { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
-                { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
-                { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
-              ]
-            : []),
-        ],
-      },
+      // Every route EXCEPT /embed keeps the existing framing rule (frame-ancestors 'self' + landing domain, or X-Frame-Options).
+      { source: "/((?!embed/|embed$).*)", headers: [...securityHeaders, ...FRAME_HEADERS] },
+      // /embed gets the same security headers but no frame header here: proxy.ts sets frame-ancestors from the partner allowlist.
+      { source: "/embed/:path*", headers: securityHeaders },
     ]
   },
   images: {

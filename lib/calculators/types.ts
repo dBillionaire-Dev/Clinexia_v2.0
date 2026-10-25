@@ -5,6 +5,15 @@ export interface SelectOption {
   label: string
 }
 
+/** Where an input can be read from in a FHIR record. Optional metadata, used by integrations (see lib/calculators/coding-metadata.ts). */
+export interface FhirMapping {
+  resource: "Patient" | "Observation"
+  /** Element path on the resource, e.g. "birthDate" or "gender" for Patient. */
+  path?: string
+  /** LOINC code of the Observation to read. UNVERIFIED unless docs/integration/FINDINGS.md says otherwise. */
+  loinc?: string
+}
+
 export interface InputDefinition {
   id: string
   label: string
@@ -18,6 +27,12 @@ export interface InputDefinition {
   options?: SelectOption[]
   helpText?: string
   optional?: boolean
+  /** LOINC code of the observation this input corresponds to (integration metadata; UNVERIFIED until checked, see FINDINGS.md). */
+  loinc?: string
+  /** UCUM unit string for the input's unit, e.g. "mg/dL", "10*9/L". */
+  ucum?: string
+  /** How to read this input from a FHIR Patient or Observation. */
+  fhir?: FhirMapping
 }
 
 export interface CalculationField {
@@ -42,6 +57,10 @@ export interface CalculationResult {
   warnings?: string[]
   /** The dose of ONE administration in mg (a range when the source gives one). Lets the app also show the volume per dose. */
   perDoseMg?: { low: number; high?: number }
+  /** Optional coding for the primary result (integration metadata). Calculators do not set these; see getResultCoding(). */
+  loinc?: string
+  ucum?: string
+  fhir?: FhirMapping
 }
 
 export type CalculatorGroup =

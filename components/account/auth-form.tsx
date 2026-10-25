@@ -20,14 +20,15 @@ export function AuthForm({ onDone, initialMode = "signup", onNeedsConfirmation }
   const [error, setError] = useState("")
   const [notice, setNotice] = useState("")
   const [forgot, setForgot] = useState(false)
+  const [restorable, setRestorable] = useState(false)
   const set = (k: keyof typeof f, v: string) => setF((cur) => ({ ...cur, [k]: v, ...(k === "background" ? { role: "" } : {}) }))
 
-  async function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent, restore = false) {
     e.preventDefault()
-    setBusy(true); setError(""); setNotice("")
-    const r = mode === "login" ? await api("/api/account/login", { email: f.email, password: f.password, anonymousId: getAnonymousId() }) : await api<{ signedIn: boolean }>("/api/account/signup", { ...f, accountType: type, anonymousId: getAnonymousId() })
+    setBusy(true); setError(""); setNotice(""); setRestorable(false)
+    const r = mode === "login" ? await api("/api/account/login", { email: f.email, password: f.password, anonymousId: getAnonymousId(), ...(restore ? { restore: true } : {}) }) : await api<{ signedIn: boolean }>("/api/account/signup", { ...f, accountType: type, anonymousId: getAnonymousId() })
     setBusy(false)
-    if (!r.ok) return setError(r.error)
+    if (!r.ok) { setRestorable(r.status === 410); return setError(r.error) } // 410: a deleted account that can still be restored
     if (mode === "signup" && !(r.data as { signedIn: boolean }).signedIn) {
       if (onNeedsConfirmation) return onNeedsConfirmation(f.email.trim().toLowerCase())
       return setNotice("Check your email to confirm your address, then sign in.")
@@ -71,6 +72,7 @@ export function AuthForm({ onDone, initialMode = "signup", onNeedsConfirmation }
         </>
       )}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      {restorable && <Button type="button" variant="outline" disabled={busy} onClick={(e) => submit(e as unknown as React.FormEvent, true)}>Restore my account</Button>}
       {notice && <p role="status" className="text-sm">{notice}</p>}
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" disabled={busy}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : mode === "login" ? "Sign in" : "Create account"}</Button>

@@ -2,6 +2,7 @@ import { suspendedMessage } from "@/lib/billing/admin-rules"
 import { guard, json, problem, readJson } from "@/lib/billing/route-kit"
 import { refreshSession, userFromAccessToken } from "@/lib/billing/session"
 import { getUserStatus } from "@/lib/billing/store"
+import { deletionPhase } from "@/lib/billing/account-deletion"
 
 export const dynamic = "force-dynamic"
 
@@ -25,6 +26,7 @@ export async function POST(request: Request) {
     if (!user) return problem("Please sign in again.", 401)
     const status = await getUserStatus(user.id)
     if (status.status === "suspended") return problem(suspendedMessage(status.notice), 403)
+    if (deletionPhase(status, Date.now()).phase !== "none") return problem("Please sign in again.", 401)
     return json({ session: { access_token: session.access_token, refresh_token: session.refresh_token, expires_in: session.expires_in ?? 3600 } })
   } catch {
     return problem("Could not refresh the sign-in right now.", 503)

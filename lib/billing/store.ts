@@ -267,11 +267,25 @@ export async function setOrgMarket(orgId: string, market: Market) {
 }
 
 // ---- user status (suspension) ----
-export interface UserStatus { status: "active" | "suspended"; reason: string | null; notice: string | null }
+export interface UserStatus { status: "active" | "suspended"; reason: string | null; notice: string | null; deletedAt?: string | null; deletionFinalAt?: string | null; deletedEmail?: string | null }
+
+// Until supabase/account-deletion.sql has been run the deletion columns do not exist; remember that for a minute instead of failing every request.
+let deletionColumnsMissingUntil = 0
 
 export async function getUserStatus(userId: string): Promise<UserStatus> {
-  const [r] = await db.select("billing_user_status", `select=status,reason,notice&user_id=eq.${uuid(userId)}`)
-  return r ? { status: r.status === "suspended" ? "suspended" : "active", reason: r.reason ?? null, notice: r.notice ?? null } : { status: "active", reason: null, notice: null }
+  const id = uuid(userId)
+  let r: any
+  if (Date.now() >= deletionColumnsMissingUntil) {
+    try {
+      ;[r] = await db.select("billing_user_status", `select=status,reason,notice,deleted_at,deletion_final_at,deleted_email&user_id=eq.${id}`)
+    } catch {
+      deletionColumnsMissingUntil = Date.now() + 60_000
+      ;[r] = await db.select("billing_user_status", `select=status,reason,notice&user_id=eq.${id}`)
+    }
+  } else [r] = await db.select("billing_user_status", `select=status,reason,notice&user_id=eq.${id}`)
+  return r
+    ? { status: r.status === "suspended" ? "suspended" : "active", reason: r.reason ?? null, notice: r.notice ?? null, deletedAt: r.deleted_at ?? null, deletionFinalAt: r.deletion_final_at ?? null, deletedEmail: r.deleted_email ?? null }
+    : { status: "active", reason: null, notice: null }
 }
 
 export async function setUserStatus(userId: string, status: "active" | "suspended", reason: string | null, notice: string | null) {

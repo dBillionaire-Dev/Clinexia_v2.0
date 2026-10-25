@@ -530,6 +530,12 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return
   if (!isSameOrigin(request.url)) return
 
+  // Integration URLs are never cached: /embed, and calculator or conversion links with a query string (prefill values can be
+  // patient data and the cache key is the full URL). Offline use of the plain pages is unchanged.
+  const requestUrl = new URL(request.url)
+  if (requestUrl.pathname.startsWith("/embed/")) return
+  if (request.mode === "navigate" && requestUrl.search && /^\/(calculators|conversions)(\/|$)/.test(requestUrl.pathname)) return
+
   if (request.mode === "navigate") {
     event.respondWith(handleNavigation(request))
     return

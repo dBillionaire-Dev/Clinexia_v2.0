@@ -17,10 +17,11 @@ const MISSING = /pgrst20[245]|42p01|42703|does not exist|could not find (the )?(
 // Which SQL file creates what (most specific first).
 const FILE_FOR: Array<[RegExp, string]> = [
   [/billing_device_links|billing_link_device|billing_backfill|billing_forget/i, "supabase/billing-link.sql"],
+  [/deleted_at|deletion_final_at|deleted_email/i, "supabase/account-deletion.sql"],
   [/billing_org_groups|billing_provision_member|billing_memberships\.(group_id|disabled|managed)/i, "supabase/org-directory.sql"],
   [/bucket not found|storage.*avatars|avatars.*bucket/i, "supabase/avatars.sql"],
   [/push_messages_audience_check|push_messages\.user_id|user_id.*push_messages/i, "supabase/user-messages.sql"],
-  [/billing_launch|introduced_at|new_user_trial_days/i, "supabase/billing-launch.sql"],
+  [/billing_launch|introduced_at|new_user_trial_days|require_account/i, "supabase/billing-launch.sql"],
   [/emailed_at|receipt_sent_at|reminder_sent_for/i, "supabase/email-notifications.sql"],
   [/billing_user_status|\bmarket\b|\bsource\b/i, "supabase/billing-admin.sql"],
   [/app_campaign|platforms/i, "supabase/campaigns.sql"],

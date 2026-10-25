@@ -4,7 +4,7 @@ import { cleanNewUserDays, cleanTrialDays, NO_LAUNCH, personalTrialEnd, resolveL
 const NOW = Date.parse("2026-11-01T00:00:00Z")
 const DAY = 86_400_000
 const iso = (t: number) => new Date(t).toISOString()
-const on = (over: Partial<LaunchState> = {}): LaunchState => ({ enforce: true, freeUntil: null, introducedAt: iso(NOW - DAY), newUserTrialDays: 7, ...over })
+const on = (over: Partial<LaunchState> = {}): LaunchState => ({ enforce: true, freeUntil: null, introducedAt: iso(NOW - DAY), newUserTrialDays: 7, requireAccount: false, ...over })
 
 describe("payments hidden, introduced, and the free periods", () => {
   it("is hidden by default: nothing shown, nothing locked", () => {
@@ -32,6 +32,21 @@ describe("payments hidden, introduced, and the free periods", () => {
   })
   it("BILLING_ENABLED=false beats everything", () => {
     expect(resolveLaunch(on(), { BILLING_ENABLED: "false", BILLING_ENFORCE_PREMIUM: "true" }, NOW)).toMatchObject({ enforced: false, switchedOn: false })
+  })
+})
+
+describe("account required after 3 free calculations", () => {
+  it("is off by default and does not need payments", () => {
+    expect(resolveLaunch(NO_LAUNCH, {}, NOW)).toMatchObject({ guestLimit: false, requireAccount: false })
+    expect(resolveLaunch({ ...NO_LAUNCH, requireAccount: true }, {}, NOW)).toMatchObject({ guestLimit: true, requireAccount: true, switchedOn: false })
+  })
+  it("payments locking calculators also limits guests, but not during the free period", () => {
+    expect(resolveLaunch(on(), {}, NOW).guestLimit).toBe(true)
+    expect(resolveLaunch(on({ freeUntil: iso(NOW + DAY) }), {}, NOW).guestLimit).toBe(false)
+    expect(resolveLaunch(on({ freeUntil: iso(NOW + DAY), requireAccount: true }), {}, NOW).guestLimit).toBe(true)
+  })
+  it("never applies when accounts are switched off", () => {
+    expect(resolveLaunch({ ...NO_LAUNCH, requireAccount: true }, { BILLING_ENABLED: "false" }, NOW)).toMatchObject({ guestLimit: false, requireAccount: false })
   })
 })
 

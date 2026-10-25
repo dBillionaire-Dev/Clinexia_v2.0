@@ -75,6 +75,20 @@ export async function createConfirmedUser(email: string, fullName: string): Prom
   return { ok: false, reason: code === "email_exists" || code === "user_already_exists" || res.status === 422 ? "exists" : "error" }
 }
 
+/** Final step of a soft delete: give the account an unusable email (so the real address can register again) and block any sign-in. Nothing is removed. */
+export async function retireAuthUser(id: string, newEmail: string): Promise<void> {
+  const { base, headers } = conn()
+  const res = await fetch(`${base}/users/${uuid(id)}`, { method: "PUT", headers, body: JSON.stringify({ email: newEmail, email_confirm: true, ban_duration: "876000h" }), cache: "no-store" })
+  if (!res.ok) throw new Error(`Supabase retire user failed (${res.status})`)
+}
+
+/** Undoes retireAuthUser: puts the original email back and lifts the block. Fails if somebody else has taken that email. */
+export async function unretireAuthUser(id: string, email: string): Promise<void> {
+  const { base, headers } = conn()
+  const res = await fetch(`${base}/users/${uuid(id)}`, { method: "PUT", headers, body: JSON.stringify({ email, email_confirm: true, ban_duration: "none" }), cache: "no-store" })
+  if (!res.ok) throw new Error(`Supabase restore user failed (${res.status})`)
+}
+
 export async function deleteAuthUser(id: string): Promise<void> {
   const { base, headers } = conn()
   const res = await fetch(`${base}/users/${uuid(id)}`, { method: "DELETE", headers })

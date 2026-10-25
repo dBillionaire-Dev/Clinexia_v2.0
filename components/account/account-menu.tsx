@@ -31,7 +31,7 @@ export function AccountMenu() {
 
   async function signOut() {
     await fetch("/api/account/logout", { method: "POST" }).catch(() => undefined)
-    try { writeSessionState(window.localStorage, { enforced: s.enforced, signedIn: false }) } catch { /* ignore */ }
+    try { writeSessionState(window.localStorage, { enforced: s.enforced, guestLimit: s.guestLimit, signedIn: false }) } catch { /* ignore */ }
     window.location.href = "/"
   }
 

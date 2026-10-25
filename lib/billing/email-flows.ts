@@ -120,7 +120,8 @@ export async function runPlanReminders(baseUrl: string, now = Date.now()): Promi
         orgName = org.name
       }
       if (!userId) return null
-      if ((await getUserStatus(userId)).status === "suspended") return null
+      const st = await getUserStatus(userId)
+      if (st.status === "suspended" || st.deletedAt) return null // nothing is sent to suspended or deleted accounts
       const auth = await getAuthUser(userId)
       if (!auth?.email) return null
       const e = composeReminderEmail({

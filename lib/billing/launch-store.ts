@@ -12,6 +12,7 @@ const toState = (row: any): LaunchState => ({
   freeUntil: row.free_until ?? null,
   introducedAt: row.introduced_at ?? null,
   newUserTrialDays: Number.isInteger(row.new_user_trial_days) ? row.new_user_trial_days : DEFAULT_NEW_USER_TRIAL_DAYS,
+  requireAccount: row.require_account === true,
 })
 
 export async function getLaunch(now = Date.now()): Promise<LaunchState> {
@@ -19,9 +20,13 @@ export async function getLaunch(now = Date.now()): Promise<LaunchState> {
   try {
     let row: any
     try {
-      ;[row] = await db.select("billing_launch", "select=enforce,free_until,introduced_at,new_user_trial_days&id=eq.1")
+      ;[row] = await db.select("billing_launch", "select=enforce,free_until,introduced_at,new_user_trial_days,require_account&id=eq.1")
     } catch {
-      ;[row] = await db.select("billing_launch", "select=enforce,free_until&id=eq.1") // before billing-launch.sql was re-run
+      try {
+        ;[row] = await db.select("billing_launch", "select=enforce,free_until,introduced_at,new_user_trial_days&id=eq.1") // before billing-launch.sql was re-run
+      } catch {
+        ;[row] = await db.select("billing_launch", "select=enforce,free_until&id=eq.1")
+      }
     }
     const state = row ? toState(row) : NO_LAUNCH
     cache = { at: now, state }
@@ -32,9 +37,17 @@ export async function getLaunch(now = Date.now()): Promise<LaunchState> {
 }
 
 export async function saveLaunch(state: LaunchState): Promise<LaunchState> {
-  const row = { enforce: state.enforce, free_until: state.freeUntil, introduced_at: state.introducedAt, new_user_trial_days: state.newUserTrialDays, updated_at: new Date().toISOString() }
-  const changed = await db.update("billing_launch", "id=eq.1", row)
-  if (changed.length === 0) await db.insert("billing_launch", { id: 1, ...row })
+  const row = { enforce: state.enforce, free_until: state.freeUntil, introduced_at: state.introducedAt, new_user_trial_days: state.newUserTrialDays, require_account: state.requireAccount, updated_at: new Date().toISOString() }
+  try {
+    const changed = await db.update("billing_launch", "id=eq.1", row)
+    if (changed.length === 0) await db.insert("billing_launch", { id: 1, ...row })
+  } catch (error) {
+    // The newer column is missing until billing-launch.sql is re-run: everything else still saves; only turning the account requirement ON needs it.
+    if (state.requireAccount) throw error
+    const { require_account: _unused, ...rest } = row
+    const changed = await db.update("billing_launch", "id=eq.1", rest)
+    if (changed.length === 0) await db.insert("billing_launch", { id: 1, ...rest })
+  }
   cache = { at: Date.now(), state }
   return state
 }

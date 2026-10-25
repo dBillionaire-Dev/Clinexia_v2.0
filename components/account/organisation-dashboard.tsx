@@ -8,6 +8,7 @@ import { confirmDialog, type ConfirmOptions } from "@/components/ui/app-dialogs"
 import { api } from "@/lib/billing/client"
 import { SPECIALTIES, SPECIALTY_LABELS, type Specialty } from "@/lib/billing/config"
 import { PlanPicker } from "./plan-picker"
+import { ApiKeysPanel } from "./api-keys-panel"
 import { OrgDirectory, type Group } from "./org-directory"
 import { useAccountSession } from "@/lib/billing/use-account-session"
 
@@ -125,6 +126,8 @@ export function OrganisationDashboard({ orgId }: { orgId: string }) {
       </section>
 
       {isManager && active && <OrgDirectory role={d.role} groups={d.groups ?? []} act={act} />}
+
+      {isManager && <ApiKeysPanel orgId={orgId} role={d.role} />}
 
       {isManager && (
         <section className="space-y-3">

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { PremiumGate } from "@/components/account/premium-gate"
 import { AccessBadge } from "@/components/account/access-badge"
@@ -24,6 +24,17 @@ import { cn } from "@/lib/utils"
 import { getDosingSafetyWarnings, validateCalculatorInputBounds } from "@/lib/calculators/dosing-safety"
 import { getCalculatorSafetyWarnings } from "@/lib/calculators/calculation-safety"
 import { getCalculatorReferences } from "@/lib/calculators/dosing-references"
+import { parsePrefill } from "@/lib/integration/prefill"
+import { prefillUnitResolver } from "@/lib/integration/normalise"
+import {
+  buildReadyMessage,
+  buildResultMessage,
+  formulaVersionFor,
+  isTrustedParentMessage,
+  parsePrefillMessage,
+  postToParent,
+  type EmbedConfig,
+} from "@/lib/integration/embed-bridge"
 
 function defaultValues(def: CalculatorDefinition | undefined): Record<string, string> {
   if (!def) return {}
@@ -37,7 +48,7 @@ function defaultValues(def: CalculatorDefinition | undefined): Record<string, st
   return values
 }
 
-function CalculatorRunnerInner({ calculatorId }: { calculatorId: string }) {
+function CalculatorRunnerInner({ calculatorId, embed }: { calculatorId: string; embed?: EmbedConfig }) {
   const definition = getCalculatorById(calculatorId)
   const [values, setValues] = useState<Record<string, string>>(() => defaultValues(definition))
   const [result, setResult] = useState<CalculationResult | null>(null)
@@ -51,6 +62,40 @@ function CalculatorRunnerInner({ calculatorId }: { calculatorId: string }) {
   const references = useMemo(() => (definition ? getCalculatorReferences(definition) : []), [definition])
   const resultHeadingRef = useRef<HTMLHeadingElement>(null)
   const lastParsedInputsRef = useRef<Record<string, number | string> | null>(null)
+  const valuesRef = useRef(values)
+  valuesRef.current = values
+  const handleCalculateRef = useRef<((override?: Record<string, string>) => Promise<void>) | null>(null)
+  const prefillAppliedRef = useRef(false)
+
+  // Deep links (?age=54&weight=70&creatinine=1.2&sex=male): each value is validated against its input; invalid or unknown
+  // ones are ignored. Nothing is calculated unless the link also has calculate=1. Values are never logged or sent anywhere.
+  useEffect(() => {
+    if (!definition || prefillAppliedRef.current) return
+    prefillAppliedRef.current = true
+    const prefill = parsePrefill(definition, new URLSearchParams(window.location.search), { unitResolver: prefillUnitResolver })
+    if (Object.keys(prefill.values).length === 0) return
+    const merged = { ...defaultValues(definition), ...prefill.values }
+    setValues(merged)
+    if (prefill.calculate) void handleCalculateRef.current?.(merged)
+  }, [definition])
+
+  // Embedded with ?postMessage=1: announce readiness and accept prefill messages from the allowlisted parent only.
+  useEffect(() => {
+    if (!definition || !embed?.postMessage || !embed.parentOrigin) return
+    const parentOrigin = embed.parentOrigin
+    const onMessage = (event: MessageEvent) => {
+      if (!isTrustedParentMessage(event, parentOrigin, window.parent)) return
+      const message = parsePrefillMessage(event.data)
+      if (!message) return
+      const prefill = parsePrefill(definition, message.values, { unitResolver: prefillUnitResolver })
+      const merged = { ...valuesRef.current, ...prefill.values }
+      if (Object.keys(prefill.values).length > 0) setValues(merged)
+      if (message.calculate) void handleCalculateRef.current?.(merged)
+    }
+    window.addEventListener("message", onMessage)
+    postToParent(window.parent, parentOrigin, buildReadyMessage(definition.id))
+    return () => window.removeEventListener("message", onMessage)
+  }, [definition, embed?.postMessage, embed?.parentOrigin])
 
   if (!definition) {
     return (
@@ -97,15 +142,16 @@ function CalculatorRunnerInner({ calculatorId }: { calculatorId: string }) {
     }
   }
 
-  const handleCalculate = async () => {
+  const handleCalculate = async (override?: Record<string, string>) => {
     if (calculating) return
     setError(null)
     setSavedToHistory(false)
     setCalculating(true)
     try {
       const parsed: Record<string, number | string> = {}
+      const source = override ?? values
       for (const input of definition.inputs) {
-        const raw = values[input.id] ?? ""
+        const raw = source[input.id] ?? ""
         if (raw === "" && !input.optional) {
           throw new Error(`${input.label} is required.`)
         }
@@ -124,8 +170,14 @@ function CalculatorRunnerInner({ calculatorId }: { calculatorId: string }) {
 
       lastParsedInputsRef.current = parsed
       setResult(finalResult)
-      recordUsage(definition.id)
-      await saveResultToHistory(parsed, finalResult)
+      // Embedded views never keep usage or history: saving to history also reports to analytics.
+      if (!embed) {
+        recordUsage(definition.id)
+        await saveResultToHistory(parsed, finalResult)
+      }
+      if (embed?.postMessage) {
+        postToParent(window.parent, embed.parentOrigin, buildResultMessage(definition.id, formulaVersionFor(definition.id), finalResult))
+      }
       requestAnimationFrame(() => resultHeadingRef.current?.focus())
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to calculate this result.")
@@ -133,6 +185,8 @@ function CalculatorRunnerInner({ calculatorId }: { calculatorId: string }) {
       setCalculating(false)
     }
   }
+
+  handleCalculateRef.current = handleCalculate
 
   const handleReset = () => {
     setValues(defaultValues(definition))
@@ -232,6 +286,7 @@ function CalculatorRunnerInner({ calculatorId }: { calculatorId: string }) {
           </div>
           <div className="flex shrink-0 items-center gap-1">
             
+            {!embed ? (
             <Button
               type="button"
               variant="ghost"
@@ -242,6 +297,7 @@ function CalculatorRunnerInner({ calculatorId }: { calculatorId: string }) {
             >
               <Star className={cn("h-5 w-5", favorite && "fill-yellow-400 text-yellow-400")} />
             </Button>
+            ) : null}
           <Button
             variant="ghost"
             size="icon"
@@ -456,7 +512,8 @@ function CalculatorRunnerInner({ calculatorId }: { calculatorId: string }) {
               <Button variant="outline" size="sm" onClick={handleCopy}>
                 <Copy className="h-4 w-4 mr-1.5" /> Copy
               </Button>
-              <Button
+              {!embed ? (
+            <Button
                 variant="outline"
                 size="sm"
                 onClick={() => {
@@ -471,6 +528,7 @@ function CalculatorRunnerInner({ calculatorId }: { calculatorId: string }) {
               >
                 <Save className="h-4 w-4 mr-1.5" /> {savedToHistory ? "Saved" : "Save to history"}
               </Button>
+            ) : null}
               <Button variant="outline" size="sm" onClick={handleShare}>
                 <Share2 className="h-4 w-4 mr-1.5" /> Share
               </Button>
@@ -485,7 +543,7 @@ function CalculatorRunnerInner({ calculatorId }: { calculatorId: string }) {
                 <p className="mt-1 text-amber-800 dark:text-amber-300">This result has been checked for input bounds and basic plausibility. It does not replace drug-specific dosing guidance, clinical assessment or therapeutic monitoring.</p>
               </div>
             ) : null}
-            <p className="text-xs text-muted-foreground">{CALCULATION_DISCLAIMER}</p>
+            {!embed ? <p className="text-xs text-muted-foreground">{CALCULATION_DISCLAIMER}</p> : null}
             {isHighRiskCategory(definition.category) ? (
               <p className="text-xs text-amber-700 dark:text-amber-300">Results are calculation aids, not prescriptions or treatment orders. Verify the indication, patient population, route, formulation, maximum dose, current guideline and local protocol before acting on them.</p>
             ) : null}
@@ -493,7 +551,7 @@ function CalculatorRunnerInner({ calculatorId }: { calculatorId: string }) {
         </Card>
       ) : null}
 
-      {related.length ? (
+      {!embed && related.length ? (
         <div className="print:hidden">
           <h3 className="text-sm font-medium text-muted-foreground mb-2">Related &amp; recommended tools</h3>
           <div className="flex flex-wrap gap-2">
@@ -512,10 +570,10 @@ function CalculatorRunnerInner({ calculatorId }: { calculatorId: string }) {
 }
 
 /** Public entry point: the runner behind the premium lock (a no-op unless locking is switched on). */
-export function CalculatorRunner({ calculatorId }: { calculatorId: string }) {
+export function CalculatorRunner({ calculatorId, embed }: { calculatorId: string; embed?: EmbedConfig }) {
   return (
     <PremiumGate id={calculatorId}>
-      <CalculatorRunnerInner calculatorId={calculatorId} />
+      <CalculatorRunnerInner calculatorId={calculatorId} embed={embed} />
     </PremiumGate>
   )
 }

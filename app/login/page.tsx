@@ -7,9 +7,9 @@ export const dynamic = "force-dynamic"
 export const metadata: Metadata = { title: "Sign in", robots: { index: false, follow: false } }
 
 // Not linked from the home page and not in the sitemap. Reachable by address (and from the navbar account icon) while accounts are on.
-export default async function Page({ searchParams }: { searchParams: Promise<{ next?: string; registered?: string; confirmed?: string; changed?: string }> }) {
+export default async function Page({ searchParams }: { searchParams: Promise<{ next?: string; registered?: string; confirmed?: string; changed?: string; deleted?: string }> }) {
   if (!billingEnabled()) notFound()
   const q = await searchParams
-  const notice = q.changed ? "changed" : q.confirmed ? "confirmed" : q.registered ? "registered" : null
+  const notice = q.deleted ? "deleted" : q.changed ? "changed" : q.confirmed ? "confirmed" : q.registered ? "registered" : null
   return <div className="mx-auto w-full max-w-md px-4 py-12"><AuthPage mode="login" next={q.next} notice={notice} /></div>
 }

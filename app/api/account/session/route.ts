@@ -14,17 +14,18 @@ export async function GET() {
   if (!billingEnabled()) return reply({ enabled: false, enforced: false, signedIn: false })
   const launch = await getLaunchStatus()
   const enforced = launch.enforced
+  const guestLimit = launch.guestLimit
   const payments = launch.switchedOn // false = payments are hidden: no prices, plans or checkout are shown
   const trial = launch.trial ? { trial: true, trialEndsAt: launch.freeUntil } : {}
   const user = await currentUser().catch(() => null)
-  if (!user) return reply({ enabled: true, enforced, payments, signedIn: false, ...trial })
+  if (!user) return reply({ enabled: true, enforced, guestLimit, payments, signedIn: false, ...trial })
   try {
     const [pricing, inputs] = await Promise.all([getPricing(), loadEntitlementInputs(user.id)])
     const e = resolveEntitlements({ ...inputs, now: Date.now(), graceDays: pricing.graceDays })
     // A person who joined after payments were introduced has full access during their own free period.
     const own = enforced && !e.all ? await activePersonalTrial(user.id, launch) : null
-    return reply({ enabled: true, enforced, payments, signedIn: true, email: user.email, avatarUrl: user.avatarUrl ?? null, entitlements: { all: e.all || own !== null, specialties: e.specialties }, ...(own ? { trial: true, trialEndsAt: own } : trial) })
+    return reply({ enabled: true, enforced, guestLimit, payments, signedIn: true, email: user.email, avatarUrl: user.avatarUrl ?? null, entitlements: { all: e.all || own !== null, specialties: e.specialties }, ...(own ? { trial: true, trialEndsAt: own } : trial) })
   } catch {
-    return reply({ enabled: true, enforced, payments, signedIn: true, email: user.email, avatarUrl: user.avatarUrl ?? null, ...trial })
+    return reply({ enabled: true, enforced, guestLimit, payments, signedIn: true, email: user.email, avatarUrl: user.avatarUrl ?? null, ...trial })
   }
 }

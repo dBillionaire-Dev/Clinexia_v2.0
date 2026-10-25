@@ -5,6 +5,8 @@
 /.next/
 /out/
 
+*.sh
+
 # production
 /build
 
@@ -19,7 +21,6 @@ yarn-error.log*
 
 # vercel
 .vercel
-apply-app-integrations.sh
 
 # typescript
 *.tsbuildinfo
@@ -33,3 +34,9 @@ next-env.d.ts
 
 # backups made by clinexia-apply.sh
 .clinexia-backup/
+
+# backup files
+*.bak*
+
+# keep the documented example env file
+!.env.example

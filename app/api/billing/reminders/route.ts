@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto"
 import { NextResponse } from "next/server"
 import { billingEnabled } from "@/lib/billing/config"
 import { publicBaseUrl, retryPendingReceipts, runPlanReminders } from "@/lib/billing/email-flows"
+import { finalizeDeletions } from "@/lib/billing/account-deletion"
 import { errorText, explainSetupError } from "@/lib/billing/setup-hints"
 
 export const dynamic = "force-dynamic"
@@ -20,7 +21,8 @@ async function run(request: Request) {
   try {
     const reminders = await runPlanReminders(base)
     const receiptsRetried = await retryPendingReceipts(base)
-    return NextResponse.json({ ...reminders, receiptsRetried }, { headers: { "Cache-Control": "no-store" } })
+    const deletionsFinalised = await finalizeDeletions()
+    return NextResponse.json({ ...reminders, receiptsRetried, deletionsFinalised }, { headers: { "Cache-Control": "no-store" } })
   } catch (error) {
     const message = errorText(error)
     console.error("Clinexia reminders failed:", message)

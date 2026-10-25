@@ -240,3 +240,19 @@ export function composeAccountCreatedEmail(input: { name: string; orgName: strin
   )
   return { subject: `${who} added you to ${input.orgName} on Clinexia`, text, html }
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
+// 7. Your account was deleted
+// ---------------------------------------------------------------------------------------------------------------------
+export function composeAccountDeletedEmail(input: { name: string; restoreUntil: string; loginUrl: string }): ComposedEmail {
+  const hello = input.name.trim() ? `Hello ${input.name.trim()},` : "Hello,"
+  const until = formatDate(input.restoreUntil)
+  const text = [hello, "", "Your Clinexia account has been deleted and you have been signed out everywhere.", "", `Changed your mind? Sign in with your email and password before ${until} and choose “Restore my account”. After that date it cannot be restored from the app.`, input.loginUrl, "", "If you did not do this, sign in and restore the account straight away, then change your password.", "", "The Clinexia team"].join("\n")
+  const html = shell(
+    "Your account was deleted",
+    para(escapeHtml(hello)) + para("Your Clinexia account has been deleted and you have been signed out everywhere.") +
+      para(`Changed your mind? Sign in before <strong>${escapeHtml(until)}</strong> and choose “Restore my account”. After that date it cannot be restored from the app.`) + button("Go to sign in", input.loginUrl) +
+      small("If you did not do this, sign in and restore the account straight away, then change your password."),
+  )
+  return { subject: "Your Clinexia account was deleted", text, html }
+}
