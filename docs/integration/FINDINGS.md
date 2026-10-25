@@ -79,3 +79,22 @@ _Filled in by Phases 1-8._
 - Which factors are authoritative for lab interoperability: the engine's molecular weights or the conventional rounded factors (88.4, 18.016, 0.2495 ...)? A lab may expect the conventional ones.
 - Should mEq/L be accepted for sodium, potassium, chloride and bicarbonate (1 mEq = 1 mmol for these)? Not supported today.
 - Should inch and foot be added to the public conversion tool?
+
+## Phase 3 (formula versions, test vectors, reference gaps)
+
+### Findings
+
+- **No calculator currently has a `review-needed` reference** (all 162 are `current` or `supporting`), so `docs/integration/reference-gaps.md` lists none. If you expected gaps, the statuses in `dosing-references.ts` / `everyday-references.ts` are what to look at; nothing was edited. Note that every Clinical Chemistry, Hematology, Laboratory Solutions, Spectrophotometry, Microbiology, Cardiovascular, Stem Cell and Oncology calculator is `supporting` (none is `current`).
+- Two calculators needed hand-chosen test INPUTS because the generic choice fails or is meaningless: `gestational-age` (either LMP or due date, not both), `who-pediatric-ors-ongoing-loss` (whole stool count), `lean-body-mass` (flipping its unit selects gives invalid combinations). Results are never hand-written.
+- Date-based calculators read "today" from local time; the vectors fix today to 1 June 2026 at local noon and force en-US number formatting (two calculators use `toLocaleString`). The generated data was checked to be byte-identical when generated under five time zones and a German locale.
+
+### UNVERIFIED
+
+- The shipped baseline was generated on a different machine and Node version from yours. It is expected to match; if `pnpm test` reports a mismatch, confirm you changed no calculator and run `pnpm integration:snapshots`.
+- The test vectors detect CHANGE only. No clinician has reviewed these input sets or confirmed the expected outputs; they are a snapshot of behaviour on the baseline date.
+
+### Decisions needed
+
+- The semver policy in `docs/integration/CHANGELOG.md` (major = results change, minor = additive, patch = wording only). Wording-only edits also fail the build until bumped: confirm that is what you want.
+- Who owns clinical review of the vectors and adds known-answer cases for dosing and oncology calculators (57 + 15).
+- Whether `supporting`-only calculators (most of chemistry, haematology, etc.) should be promoted to `current` once someone verifies the sources.

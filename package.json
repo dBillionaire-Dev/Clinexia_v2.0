@@ -13,6 +13,7 @@
     "verify": "pnpm typecheck && pnpm test && pnpm build",
     "audit": "pnpm typecheck && pnpm test",
     "release:audit": "node scripts/release-audit.mjs",
+    "integration:snapshots": "node scripts/update-integration-snapshots.mjs",
     "traction:rebuild": "node --env-file=.env.local scripts/traction/rebuild-rollups.mjs",
     "traction:github": "node --env-file=.env.local scripts/traction/sync-github.mjs",
     "traction:gsc": "node --env-file=.env.local scripts/traction/sync-search-console.mjs",

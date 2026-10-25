@@ -92,7 +92,7 @@ window.addEventListener("message", (e) => {
 })
 ```
 
-Note: `version` is a placeholder `"1.0.0"` until the formula-version registry lands (Phase 3).
+`version` is the calculator's formula version from `lib/calculators/versions.ts` (see `CHANGELOG.md`): it changes whenever the calculator's behaviour changes on purpose.
 
 ## 4. What the embed does and does not do with data
 

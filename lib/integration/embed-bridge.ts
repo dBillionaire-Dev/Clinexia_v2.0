@@ -1,4 +1,5 @@
 import type { CalculationResult } from "@/lib/calculators/types"
+import { getFormulaVersion } from "@/lib/calculators/versions"
 
 /**
  * postMessage contract between an embedded calculator (child) and the host page (parent).
@@ -18,8 +19,8 @@ export interface EmbedConfig {
   parentOrigin: string | null
 }
 
-/** TEMPORARY: Phase 3 replaces this with the real per-calculator formula version (lib/calculators/versions.ts). */
-export const formulaVersionFor = (_calculatorId: string): string => "1.0.0"
+/** The calculator's formula version (lib/calculators/versions.ts); "unversioned" for an unknown id. */
+export const formulaVersionFor = (calculatorId: string): string => getFormulaVersion(calculatorId) ?? "unversioned"
 
 export type OutgoingMessage =
   | { source: typeof EMBED_MESSAGE_SOURCE; type: "ready"; calculatorId: string }
