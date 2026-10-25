@@ -14,6 +14,7 @@ import { sendAdminMessage } from "@/lib/billing/admin-message"
 import { publicBaseUrl } from "@/lib/billing/email-flows"
 import { validateUserMessage } from "@/lib/push/validate"
 import { createResetLink, requestPasswordReset } from "@/lib/billing/password-reset"
+import { adminRestore } from "@/lib/billing/account-deletion"
 import {
   deleteOrganisationCompletely, deleteUserCompletely, getOrgOwner, loadAdminUserDetail, loadAdminUsers, recordAudit, setOrgMarket, setSuspended, setUserMarket, setUserPlan, setUserStatus,
 } from "@/lib/billing/store"
@@ -142,6 +143,13 @@ export async function POST(request: Request) {
       const ok = link ? await linkDevice(userId, user.email, body.anonymousId) : await unlinkDevice(userId, body.anonymousId)
       if (!ok) return out({ error: link ? "Could not link that device. Has supabase/billing-link.sql been run?" : "That device was not linked to this account." }, link ? 500 : 404)
       await recordAudit({ actorKind: "platform_admin", actorUserId: userId, action: link ? "device.linked" : "device.unlinked", detail: { anonymousId: body.anonymousId } })
+      return out({ ok: true })
+    }
+    case "restoreDeletedAccount": {
+      if (!isUuid(userId)) return out({ error: "Invalid user." }, 400)
+      const r = await adminRestore(userId)
+      if (!r.ok) return out({ error: r.error }, 409)
+      await recordAudit({ actorKind: "platform_admin", actorUserId: userId, action: "user.deletion_restored", detail: {} })
       return out({ ok: true })
     }
     case "resetPassword": {

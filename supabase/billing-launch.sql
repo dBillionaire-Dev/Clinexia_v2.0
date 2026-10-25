@@ -15,3 +15,6 @@ insert into public.billing_launch (id) values (1) on conflict (id) do nothing;
 -- If payments were already switched on with the earlier version, treat them as introduced now.
 update public.billing_launch set introduced_at = coalesce(introduced_at, updated_at) where enforce and introduced_at is null;
 alter table public.billing_launch enable row level security;
+
+-- "Require an account after 3 free calculations" (works with payments hidden). Run again if you ran an earlier version.
+alter table public.billing_launch add column if not exists require_account boolean not null default false;

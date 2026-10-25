@@ -13,7 +13,7 @@ const EXEMPT = /^\/(login|register|account|admin|welcome|privacy|terms|diagnosti
 const FIELDS = 'input,textarea,select,button,[contenteditable="true"],[role="button"],[role="combobox"],[role="switch"],[role="checkbox"],[role="radio"],[role="tab"]'
 
 /**
- * Mounted once for the whole app. While premium locking is on, a signed-out visitor gets GUEST_CALC_LIMIT calculations per device;
+ * Mounted once for the whole app. While an account is required (admin setting, or premium locking), a signed-out visitor gets GUEST_CALC_LIMIT calculations per device;
  * after that the page content becomes browse-only: links still work, anything else asks them to create an account.
  */
 export function GuestGuard() {
@@ -23,7 +23,7 @@ export function GuestGuard() {
   const [count, setCount] = useState(0)
   const dialogOpen = useRef(false)
   const exempt = EXEMPT.test(pathname)
-  const limited = !s.loading && isGuestLimited({ enforced: s.enforced, signedIn: s.signedIn }, count)
+  const limited = !s.loading && isGuestLimited({ enforced: s.enforced, guestLimit: s.guestLimit, signedIn: s.signedIn }, count)
   const active = limited && !exempt
 
   const ask = useCallback(async (title: string) => {

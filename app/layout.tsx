@@ -82,6 +82,63 @@ export const viewport = {
   ],
 }
 
+// Inline JSON-LD Schema to target Google's YMYL medical & software crawlers
+function ClinexiaJsonLd() {
+  const schema = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://clinexia.app",
+        "name": "Clinexia Clinical Toolkit",
+        "applicationCategory": "MedicalApplication",
+        "operatingSystem": "Windows, iOS, Android, Web Browser",
+        "downloadUrl": "https://www.clinexia.app",
+        "offers": {
+          "@type": "Offer",
+          "price": "0.00",
+          "priceCurrency": "USD"
+        },
+        "author": {
+          "@type": "Person",
+          "name": "Ebenezer Ekunke",
+          "url": "https://is-a.dev"
+        },
+        "description": "An offline-first progressive web app clinical toolkit featuring pediatric weight-based drug dosing calculators, medical unit converters, and automated EHR clinical note formatting.",
+        "features": "Offline local database syncing via IndexedDB, automated EHR note formatting, weight-based pediatric safety guardrails"
+      },
+      {
+        "@type": "MedicalWebPage",
+        "@id": "https://clinexia.app",
+        "url": "https://www.clinexia.app",
+        "name": "Clinexia | Offline Clinical Toolkit & Drug Dosing Calculator",
+        "description": "Professional medical calculator for healthcare workers. Calculate pediatric dosages, convert laboratory units, and generate clinical notes completely offline.",
+        "aspect": "diagnosis, therapeutic",
+        "mainContentOfPage": {
+          "@type": "WebPageElement",
+          "cssSelector": "main"
+        },
+        "medicalAudience": {
+          "@type": "MedicalAudience",
+          "audienceType": "HealthcareProfessionals"
+        },
+        "about": {
+          "@type": "MedicalDeviceAndSoftware",
+          "name": "Clinical Math Engine",
+          "purpose": "Drug dosage calculation and laboratory unit conversion"
+        }
+      }
+    ]
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  );
+}
+
 export default function RootLayout({
   children,
 }: {
@@ -94,6 +151,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Clinexia" />
+        <ClinexiaJsonLd />
       </head>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>

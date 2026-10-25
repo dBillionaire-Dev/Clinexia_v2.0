@@ -50,9 +50,18 @@ export async function POST(request: Request) {
       const before = await getLaunch(now)
       // "New users" are people who join after payments were introduced; changing the free periods later does not move that date.
       const introducedAt = body.enforce ? (before.enforce && before.introducedAt ? before.introducedAt : new Date(now).toISOString()) : null
-      const state = { enforce: body.enforce, freeUntil: body.enforce ? trialEnd(now, trialDays) : null, introducedAt, newUserTrialDays: newUserDays }
+      const state = { enforce: body.enforce, freeUntil: body.enforce ? trialEnd(now, trialDays) : null, introducedAt, newUserTrialDays: newUserDays, requireAccount: before.requireAccount }
       await saveLaunch(state)
       await recordAudit({ actorKind: "platform_admin", action: state.enforce ? "billing.switched_on" : "billing.switched_off", detail: { trialDays: state.enforce ? trialDays : 0, freeUntil: state.freeUntil, newUserTrialDays: newUserDays } })
+      return out({ launch: resolveLaunch(state, process.env, now) })
+    }
+    case "setGuestLimit": {
+      // Signed-out people get 3 calculations per device, then must create an account. Works with payments hidden.
+      if (typeof body.on !== "boolean") return out({ error: "Choose on or off." }, 400)
+      const now = Date.now()
+      const state = { ...(await getLaunch(now)), requireAccount: body.on }
+      await saveLaunch(state)
+      await recordAudit({ actorKind: "platform_admin", action: body.on ? "guest_limit.on" : "guest_limit.off", detail: {} })
       return out({ launch: resolveLaunch(state, process.env, now) })
     }
     case "verifyManaged":

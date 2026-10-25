@@ -3,6 +3,8 @@ import { allowSubmission } from "@/lib/feedback/rate-limit"
 import { clientKey, clientSource, guard, json, problem, readJson } from "@/lib/billing/route-kit"
 import { setSessionCookies, signInUser, userFromAccessToken } from "@/lib/billing/session"
 import { getUserStatus } from "@/lib/billing/store"
+import { deletionPhase, restoreAccount } from "@/lib/billing/account-deletion"
+import { formatDate } from "@/lib/billing/emails"
 import { suspendedMessage } from "@/lib/billing/admin-rules"
 import { errorText, explainSetupError } from "@/lib/billing/setup-hints"
 import { linkDevice } from "@/lib/billing/devices"
@@ -51,6 +53,13 @@ export async function POST(request: Request) {
   }
   if (!user || !status) return unavailable(new Error("Supabase did not return the signed-in user"))
   if (status.status === "suspended") return problem(suspendedMessage(status.notice), 403) // no session is created
+  // A deleted account: for 7 days the person may choose to restore it (the screen asks, then repeats the sign-in with restore: true).
+  const deletion = deletionPhase(status, Date.now())
+  if (deletion.phase === "final") return problem("Email or password is incorrect.", 401)
+  if (deletion.phase === "pending") {
+    if (body?.restore !== true) return problem(`This account was deleted. You can restore it until ${formatDate(deletion.restoreUntil!)}.`, 410)
+    try { await restoreAccount(user.id) } catch (error) { return unavailable(error) }
+  }
   await linkDevice(user.id, user.email, body?.anonymousId) // this device now belongs to this account in the admin
   // The website keeps the session in secure cookies. The mobile apps cannot use cookies across sites, so they receive the tokens
   // once and send them as "Authorization: Bearer" afterwards.

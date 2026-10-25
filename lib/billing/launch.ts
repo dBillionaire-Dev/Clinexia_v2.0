@@ -13,9 +13,11 @@ export interface LaunchState {
   introducedAt: string | null
   /** Free days from signup for each new user. */
   newUserTrialDays: number
+  /** Signed-out people may run only 3 calculations per device, then must create an account (independent of payments). */
+  requireAccount: boolean
 }
 export const DEFAULT_NEW_USER_TRIAL_DAYS = 7
-export const NO_LAUNCH: LaunchState = { enforce: false, freeUntil: null, introducedAt: null, newUserTrialDays: DEFAULT_NEW_USER_TRIAL_DAYS }
+export const NO_LAUNCH: LaunchState = { enforce: false, freeUntil: null, introducedAt: null, newUserTrialDays: DEFAULT_NEW_USER_TRIAL_DAYS, requireAccount: false }
 
 export interface LaunchStatus {
   /** Locks apply right now (switched on and the launch free period is over or absent). */
@@ -29,6 +31,10 @@ export interface LaunchStatus {
   envForced: boolean
   introducedAt: string | null
   newUserTrialDays: number
+  /** The administrator's "require an account" switch. */
+  requireAccount: boolean
+  /** Signed-out people are limited to 3 calculations: the switch above, or payments locking calculators. Never when accounts are off. */
+  guestLimit: boolean
 }
 
 export function resolveLaunch(state: LaunchState, env: Record<string, string | undefined>, now: number): LaunchStatus {
@@ -42,6 +48,7 @@ export function resolveLaunch(state: LaunchState, env: Record<string, string | u
   return {
     enforced: switchedOn && !trial, trial, freeUntil: switchedOn && hasEnd ? state.freeUntil : null, switchedOn, adminOn, envForced,
     introducedAt: switchedOn ? state.introducedAt : null, newUserTrialDays: state.newUserTrialDays,
+    requireAccount: on && state.requireAccount, guestLimit: on && (state.requireAccount || (switchedOn && !trial)),
   }
 }
 

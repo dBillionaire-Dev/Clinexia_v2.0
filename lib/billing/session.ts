@@ -2,6 +2,7 @@
 // on the server; the browser only ever holds two httpOnly cookies. Needs SUPABASE_URL and SUPABASE_ANON_KEY (new).
 import { cookies, headers } from "next/headers"
 import { avatarFromMetadata, type AvatarSource } from "./avatar"
+import { deletionPhase } from "./account-deletion"
 import { getUserStatus } from "./store"
 
 const ACCESS = "clinexia-access"
@@ -73,6 +74,11 @@ export async function completePasswordReset(tokenHash: string, password: string)
   return { ok: true, email }
 }
 
+/** Ends every session of the account that owns this access token. */
+export async function signOutEverywhere(accessToken: string): Promise<void> {
+  await call("logout?scope=global", { token: accessToken, body: {} }).catch(() => undefined)
+}
+
 export type PasswordChange = { ok: true } | { ok: false; reason: "wrong" | "same" | "weak" | "error" }
 
 /**
@@ -123,7 +129,9 @@ export async function clearSessionCookies() {
 async function allowed(user: AccountUser | null): Promise<AccountUser | null> {
   if (!user) return null
   try {
-    return (await getUserStatus(user.id)).status === "suspended" ? null : user
+    const st = await getUserStatus(user.id)
+    // A deleted account (pending or final) is signed out everywhere, like a suspended one.
+    return st.status === "suspended" || deletionPhase(st, Date.now()).phase !== "none" ? null : user
   } catch {
     return null
   }

@@ -18,7 +18,7 @@ type UserRow = {
 type OrgRow = { id: string; name: string; orgType: string; market: Market; seats: number; managedStatus: string; suspended: boolean; subscription: { plan: string; status: string; currentPeriodEnd: string | null } | null }
 type DeviceRow = { anonymousId: string; displayName: string; firstSeenAt: string | null; lastSeenAt: string | null; lastCalculationAt: string | null; source: string; appVersion: string; linkedAt: string | null }
 type HistoryRow = { calculator_id: string; calculator_name: string; category: string; occurred_at: string; source?: string; anonymous_id?: string }
-type Detail = { devices: DeviceRow[]; history: { total: number; capped: boolean; top: Array<{ name: string; count: number }>; firstAt: string | null; lastAt: string | null; recent: HistoryRow[] }; user: { email: string }; status: { status: string; reason: string | null }; memberships: Array<{ orgId: string; role: string; name: string }>; orders: Array<{ reference: string; amountMinor: number; currency: string; status: string; createdAt: string }>; audit: Array<{ id: number; at: string; action: string }> }
+type Detail = { devices: DeviceRow[]; history: { total: number; capped: boolean; top: Array<{ name: string; count: number }>; firstAt: string | null; lastAt: string | null; recent: HistoryRow[] }; user: { email: string }; status: { status: string; reason: string | null; deletedAt?: string | null; deletionFinalAt?: string | null; deletedEmail?: string | null }; memberships: Array<{ orgId: string; role: string; name: string }>; orders: Array<{ reference: string; amountMinor: number; currency: string; status: string; createdAt: string }>; audit: Array<{ id: number; at: string; action: string }> }
 type AuditRow = { id: number; at: string; action: string; org_id: string | null; actor_kind: string; detail: Record<string, unknown> }
 
 const d = (v: string | null) => (v ? new Date(v).toLocaleDateString() : "—")
@@ -30,6 +30,33 @@ const ENTERPRISE = [
   ["specialtyPerSeatMinor", "One specialty, per seat / month"], ["additionalSpecialtyPerSeatMinor", "Each additional specialty, per seat"], ["allAccessPerSeatMinor", "All-access, per seat / month"],
   ["allAccessBlockMinor", "All-access cap for the first block of seats"], ["extraSeatMinor", "Each seat beyond the block"],
 ] as const
+
+// ----- "create an account after 3 free calculations" -----
+function GuestLimitPanel({ launch, onChanged }: { launch: LaunchStatus; onChanged: (l: LaunchStatus) => void }) {
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState("")
+  async function set(on: boolean) {
+    const ok = await confirmDialog(on
+      ? { title: "Require an account after 3 free calculations?", description: "People who are not signed in can run 3 calculations on each device, online or offline. After that the calculators lock until they create an account or sign in.", confirmLabel: "Turn on" }
+      : { title: "Stop requiring an account?", description: "Guests can calculate freely again.", confirmLabel: "Turn off" })
+    if (!ok) return
+    setBusy(true); setMsg("")
+    const r = await api<{ launch: LaunchStatus }>("/api/admin/billing", { action: "setGuestLimit", on })
+    setBusy(false)
+    if (r.ok) { onChanged(r.data.launch); setMsg("Saved. It takes effect within about 15 seconds.") } else setMsg(r.error)
+  }
+  return (
+    <section className="rounded-lg border p-4 space-y-3 text-sm">
+      <h3 className="font-medium">Free calculations for guests</h3>
+      <p role="status">{launch.requireAccount ? "ON: people who are not signed in get 3 free calculations per device, then everything locks until they create an account." : launch.guestLimit ? "Guests are limited to 3 calculations because payments are locking calculators. You can also require an account without payments." : "OFF: guests can calculate without an account."}</p>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button disabled={busy} variant={launch.requireAccount ? "outline" : "default"} onClick={() => set(!launch.requireAccount)}>{launch.requireAccount ? "Turn off" : "Require an account after 3 calculations"}</Button>
+        {busy && <Loader2 className="h-4 w-4 animate-spin" aria-label="Saving" />}{msg && <span role="status">{msg}</span>}
+      </div>
+      <p className="text-xs text-muted-foreground">The count is kept on each device, so it also works offline. Clearing the browser or app data resets it; it steers people to sign up rather than stopping a determined person.</p>
+    </section>
+  )
+}
 
 // ----- payments: hidden, or introduced to everyone with free periods -----
 function LaunchPanel({ launch, onChanged }: { launch: LaunchStatus; onChanged: (l: LaunchStatus) => void }) {
@@ -74,6 +101,26 @@ function LaunchPanel({ launch, onChanged }: { launch: LaunchStatus; onChanged: (
       </div>
       <p className="text-xs text-muted-foreground">“Already here” means everyone, including visitors who are not signed in. Set your real prices below and test a payment before showing payments.</p>
     </section>
+  )
+}
+
+// ----- an account the person deleted themselves (soft delete): shown, and restorable -----
+function DeletedNote({ userId, status, onRestored }: { userId: string; status: { deletedAt?: string | null; deletionFinalAt?: string | null; deletedEmail?: string | null }; onRestored: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState("")
+  const final = Boolean(status.deletionFinalAt) || Date.now() >= Date.parse(status.deletedAt ?? "") + 7 * 86_400_000
+  async function restore() {
+    if (!(await confirmDialog({ title: "Restore this account?", description: final ? "The original email address is put back (if nobody else has taken it) and the person can sign in again." : "The person can sign in again.", confirmLabel: "Restore" }))) return
+    setBusy(true); setMsg("")
+    const r = await api("/api/admin/accounts", { action: "restoreDeletedAccount", userId })
+    setBusy(false)
+    if (r.ok) onRestored(); else setMsg(r.error)
+  }
+  return (
+    <div className="rounded-md border border-amber-500/50 bg-amber-50 p-3 text-xs text-amber-900 space-y-2">
+      <p><strong>Deleted by the person</strong> on {String(status.deletedAt).slice(0, 10)}. {final ? `Final${status.deletedEmail ? `; the original email was ${status.deletedEmail}` : ""}. Their data is still kept.` : "They can still restore it by signing in for 7 days."}</p>
+      <div className="flex items-center gap-3"><Button variant="outline" disabled={busy} onClick={restore}>Restore account</Button>{msg && <span role="alert">{msg}</span>}</div>
+    </div>
   )
 }
 
@@ -302,6 +349,7 @@ export function AccountsAdmin() {
             <div className="rounded-lg border p-4 text-sm space-y-2">
               <div className="flex justify-between"><p className="font-medium">{detail.user.email}</p><button className="underline" onClick={() => setDetail(null)}>Close</button></div>
               <p>Status: {detail.status.status}{detail.status.reason ? ` (${detail.status.reason})` : ""}</p>
+              {detail.status.deletedAt && <DeletedNote userId={detailId} status={detail.status} onRestored={() => void showDetail({ id: detailId } as UserRow)} />}
               <p>Organisations: {detail.memberships.length ? detail.memberships.map((m) => `${m.name} (${m.role})`).join(", ") : "none"}</p>
               <PasswordBox key={`pw-${detailId}`} userId={detailId} email={detail.user.email} />
               <MessageBox key={detailId} userId={detailId} email={detail.user.email} />
@@ -364,7 +412,7 @@ export function AccountsAdmin() {
         </section>
       )}
 
-      {tab === "Pricing" && (pricing ? <div className="space-y-6">{launch && <LaunchPanel launch={launch} onChanged={setLaunch} />}<PricingEditor initial={pricing} onSaved={setPricing} /></div> : <Loader2 className="h-5 w-5 animate-spin" aria-label="Loading" />)}
+      {tab === "Pricing" && (pricing ? <div className="space-y-6">{launch && <GuestLimitPanel launch={launch} onChanged={setLaunch} />}{launch && <LaunchPanel launch={launch} onChanged={setLaunch} />}<PricingEditor initial={pricing} onSaved={setPricing} /></div> : <Loader2 className="h-5 w-5 animate-spin" aria-label="Loading" />)}
 
       {tab === "Audit" && (
         <section className="overflow-x-auto rounded-lg border">
