@@ -132,3 +132,19 @@ export function resolveUnit(input: Pick<InputDefinition, "id" | "label" | "unit"
 
   return { ok: false, code: "unit_mismatch", message: `The unit supplied is not compatible with ${input.label} (${declaredRaw}).` }
 }
+
+/** Converts a concentration of a named analyte between mass and molar units, using the engine's molecular weights. */
+export function convertAnalyteUnits(analyteId: string, value: number, from: string, to: string): { ok: true; value: number } | { ok: false; message: string } {
+  const f = canonicalUnit(from)
+  const t = canonicalUnit(to)
+  if (!(MASS_CONC_UNITS.has(f) || MOLAR_UNITS.has(f)) || !(MASS_CONC_UNITS.has(t) || MOLAR_UNITS.has(t))) {
+    return { ok: false, message: "Units must be among mg/dL, g/dL, g/L, mg/L, umol/L, mmol/L for an analyte conversion." }
+  }
+  if (!getAnalyte(analyteId)) return { ok: false, message: "Unknown analyte." }
+  try {
+    const v = cleanNumber(fromMgdL(analyteId, toMgdL(analyteId, value, f), t))
+    return Number.isFinite(v) ? { ok: true, value: v } : { ok: false, message: "The value could not be converted." }
+  } catch {
+    return { ok: false, message: "The value could not be converted." }
+  }
+}

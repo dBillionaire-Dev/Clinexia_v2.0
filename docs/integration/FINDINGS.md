@@ -98,3 +98,34 @@ _Filled in by Phases 1-8._
 - The semver policy in `docs/integration/CHANGELOG.md` (major = results change, minor = additive, patch = wording only). Wording-only edits also fail the build until bumped: confirm that is what you want.
 - Who owns clinical review of the vectors and adds known-answer cases for dosing and oncology calculators (57 + 15).
 - Whether `supporting`-only calculators (most of chemistry, haematology, etc.) should be promoted to `current` once someone verifies the sources.
+
+## Phase 4 (public API v1)
+
+### UNVERIFIED
+
+- Nothing in this phase was run against a real Supabase project, a real Next.js build or a real browser. The handlers, key store contract, scopes, rate limiter, OpenAPI document and the no-PHI guards are tested in-process; the Supabase REST calls (`lib/api/key-store.ts`, `api_record_usage` RPC) and `supabase/api-keys.sql` have only been written to the same patterns as the existing billing code. Run the SQL, create a key, and try the curl examples in `docs/integration/api.md` against a deployment before relying on any of it.
+- The per-key rate limiter is in memory per server instance (serverless instances do not share it). It is a speed bump, not a global guarantee.
+- UCUM codes in `GET /conversions` (for example `mm[Hg]`, `[lb_av]`, `Cel`) follow the UCUM specification but were not validated by a library.
+- The catalog's `outputs` field only carries the primary result's UCUM/LOINC (calculators do not declare their outputs). LOINC codes remain UNVERIFIED (Phase 2).
+
+### Behaviour worth knowing
+
+- **Dosing and oncology (72 calculators) need the `calculate:dosing` scope.** All 15 oncology tools are treated as dosing, including the supportive-care and cycle-progress ones. Default keys cannot run them (403), the catalog hides them from default keys, and the OpenAPI document does not enumerate them. Only an organisation owner can grant the scope, and only explicitly.
+- A calculator that throws on a valid-looking combination (for example gestational age with both LMP and due date) is returned as `422 calculation_error` with the calculator's own message. A genuine bug inside a calculator would look the same.
+- A batch counts as ONE call toward the rate limit, and its items are answered separately (200, 403, 404 or 422 each).
+- Required inputs are never defaulted by the API (the web form pre-selects some).
+- Only the Authorization header is accepted; cookies and query-string keys are refused. No CORS is configured for `/api/v1` and `lib/billing/cors.ts` was not touched.
+- `key_hash` is looked up by its SHA-256 hash and then compared again in constant time. Unauthenticated calls are not metered.
+- Key management sits behind the existing billing guard, so it returns 404 when billing is switched off. It uses the existing organisation membership and audit log.
+- The NO-PHI tests: a static crawl of everything reachable from `lib/api` and `app/api/v1` (no analytics, history, feedback or UI module; no `calculation_events`/`trackCalculation`), a check that the API sources contain no `console` calls, and a runtime test that a request with identifiable-looking values produces no console output and no network call. The organisation-side key route uses the existing billing stores and is outside that crawl.
+- The privacy policy page (`app/privacy/page.tsx`) was NOT changed. It says nothing about API keys or per-key call counts. Legal wording is needed before you offer the API.
+
+### Decisions needed
+
+- **Pricing and plans for API access.** Today any organisation owner or admin can create up to 10 keys; there is no plan check, no paid tier and no quota beyond the rate limit.
+- **Browser-origin keys (CORS).** Skipped: `/api/v1` is server-to-server only. Decide whether any partner needs browser calls; if so it needs a `browser_allowed` flag per key and an origin allowlist.
+- **Who may grant `calculate:dosing`.** Default here: the organisation owner only. Confirm, and decide whether granting it needs a manual Clinexia review per organisation.
+- **Whether the supportive-care and cycle-progress oncology tools may move to `calculate:general`.**
+- **Versioning and deprecation notice period** (proposed text in `api.md`).
+- **Rate limit for production** and whether to add a shared store (Redis) for a global limit.
+- **Privacy policy and terms wording** for API use (key metering, no-PHI instruction to partners, acceptable use).
