@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react"
 import { usePathname } from "next/navigation"
-import { isEmbedPath } from "@/lib/integration/embed-headers"
+import { isFramablePath } from "@/lib/integration/embed-headers"
 
 /**
  * Renders its children everywhere except on /embed. The embed view must have no header, footer, navigation, prompts,
@@ -11,6 +11,6 @@ import { isEmbedPath } from "@/lib/integration/embed-headers"
  */
 export function SiteChrome({ children }: { children: ReactNode }) {
   const pathname = usePathname()
-  if (pathname && isEmbedPath(pathname)) return null
+  if (pathname && isFramablePath(pathname)) return null
   return <>{children}</>
 }

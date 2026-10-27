@@ -3,7 +3,7 @@
 Two things make Clinexia usable from other systems: it understands the units other systems send, and it says which
 LOINC / UCUM / FHIR element each input and result corresponds to.
 
-## 1. Unit normalisation (`lib/integration/normalise.ts`)
+## 1. Unit normalisation (`packages/core/src/integration/normalise.ts`)
 
 `normaliseInputs(definition, rawInputs)` accepts, per input, either a plain value or `{ "value": 88, "unit": "umol/L" }`
 and returns `{ inputs, conversions, errors }`:
@@ -44,7 +44,7 @@ digit (88 µmol/L creatinine converts to 0.99546 mg/dL here; the 88.4 rule of th
 
 Deep links use the same converter: `?creatinine=88&creatinine_unit=umol/L` prefills 0.99546 mg/dL.
 
-## 2. Coding metadata (`lib/calculators/coding-metadata.ts`)
+## 2. Coding metadata (`packages/core/src/calculators/coding-metadata.ts`)
 
 `InputDefinition` and `CalculationResult` gained optional `loinc`, `ucum` and `fhir` fields (`fhir` is
 `{ resource: "Patient" | "Observation", path?, loinc? }`). The values live in one table and are merged into the registry, so

@@ -6,7 +6,7 @@
 //   pnpm integration:snapshots
 import { spawnSync } from "node:child_process"
 
-const result = spawnSync("pnpm", ["exec", "vitest", "run", "lib/calculators/test-vectors.test.ts", "lib/calculators/versions.test.ts"], {
+const result = spawnSync("pnpm", ["exec", "vitest", "run", "packages/core/src/calculators/test-vectors.test.ts", "packages/core/src/calculators/versions.test.ts"], {
   stdio: "inherit",
   shell: true,
   env: { ...process.env, UPDATE_TEST_VECTORS: "1", UPDATE_REFERENCE_GAPS: "1" },

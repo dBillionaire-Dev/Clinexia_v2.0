@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
-import type { CalculatorDefinition } from "@/lib/calculators/types"
-import { getCalculatorById } from "@/lib/calculators/registry"
-import { INPUT_CODING, RESULT_CODING, getResultCoding, withCodingMetadata } from "@/lib/calculators/coding-metadata"
+import type { CalculatorDefinition } from "../calculators/types"
+import { getCalculatorById } from "../calculators/registry"
+import { INPUT_CODING, RESULT_CODING, getResultCoding, withCodingMetadata } from "../calculators/coding-metadata"
 
 /** LOINC check digit: mod 10 (Luhn) over the digits before the hyphen. Catches typos, says nothing about meaning. */
 function loincCheckDigitOk(code: string): boolean {

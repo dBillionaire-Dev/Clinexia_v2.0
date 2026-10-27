@@ -1,0 +1,36 @@
+{
+  "name": "@clinexia/core",
+  "version": "0.1.0",
+  "description": "Clinexia clinical calculators, unit conversions, unit normalisation and formula versions. No UI, no network, no storage.",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js"
+    },
+    "./vectors": {
+      "types": "./dist/types/vectors.d.ts",
+      "import": "./dist/esm/vectors.js",
+      "require": "./dist/cjs/vectors.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "prepublishOnly": "node scripts/check-publish-ready.mjs && node scripts/build.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

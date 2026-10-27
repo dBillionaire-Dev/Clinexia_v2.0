@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { corsHeadersFor, corsPath } from "@/lib/billing/cors"
-import { applyEmbedFrameHeaders, isEmbedPath } from "@/lib/integration/embed-headers"
+import { applyEmbedFrameHeaders, isFramablePath } from "@/lib/integration/embed-headers"
 import { getEmbedOrigins } from "@/lib/integration/embed-origins"
 import { APP_HOST, APP_URL, LANDING_HOST, LANDING_URL, LEGACY_HOSTS, LEGACY_REDIRECT_ON, splitEnabled } from "@/lib/site"
 
@@ -92,7 +92,7 @@ export function proxy(request: NextRequest) {
   if (cors) for (const [key, value] of Object.entries(cors)) response.headers.set(key, value)
   // /embed is the one route other sites may frame: its allowlist (env + embed_partners) is read per request, cached about a minute.
   // Only embed requests become async, so every other route behaves exactly as before.
-  if (isEmbedPath(request.nextUrl.pathname)) {
+  if (isFramablePath(request.nextUrl.pathname)) {
     return getEmbedOrigins().then((origins) => {
       applyEmbedFrameHeaders(response.headers, origins)
       return response

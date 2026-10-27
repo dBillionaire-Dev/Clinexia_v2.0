@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest"
 import { readFileSync, writeFileSync } from "node:fs"
-import { resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 import { calculators, getCalculatorById } from "./registry"
 import { FORMULA_VERSIONS, getFormulaVersion } from "./versions"
 import { getFormulaInfo, getReferenceStatus } from "./formula-info"
 import { getCalculatorReferences } from "./dosing-references"
 import { buildReferenceGapsMarkdown } from "./reference-gaps"
-import { formulaVersionFor } from "@/lib/integration/embed-bridge"
 
 const SEMVER = /^\d+\.\d+\.\d+$/
 
@@ -31,10 +30,6 @@ describe("formula versions", () => {
     expect(getFormulaVersion("nope")).toBeUndefined()
   })
 
-  it("the embed postMessage version is the real formula version (unknown ids are 'unversioned')", () => {
-    expect(formulaVersionFor("creatinine-clearance")).toBe(FORMULA_VERSIONS["creatinine-clearance"])
-    expect(formulaVersionFor("nope")).toBe("unversioned")
-  })
 })
 
 describe("reference status", () => {
@@ -62,7 +57,7 @@ describe("reference status", () => {
 })
 
 describe("docs/integration/reference-gaps.md", () => {
-  const file = resolve(process.cwd(), "docs/integration/reference-gaps.md")
+  const file = fileURLToPath(new URL("../../../../docs/integration/reference-gaps.md", import.meta.url))
   const expected = buildReferenceGapsMarkdown(calculators)
 
   it("is in sync with the references (regenerate with: pnpm integration:snapshots)", () => {

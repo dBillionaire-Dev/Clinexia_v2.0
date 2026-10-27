@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import type { CalculatorDefinition } from "@/lib/calculators/types"
-import { getCalculatorById } from "@/lib/calculators/registry"
+import type { CalculatorDefinition } from "../calculators/types"
+import { getCalculatorById } from "../calculators/registry"
 import { parsePrefill } from "./prefill"
 import { normaliseInputs, prefillUnitResolver } from "./normalise"
 

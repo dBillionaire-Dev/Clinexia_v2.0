@@ -26,6 +26,9 @@ import { getCalculatorSafetyWarnings } from "@/lib/calculators/calculation-safet
 import { getCalculatorReferences } from "@/lib/calculators/dosing-references"
 import { parsePrefill } from "@/lib/integration/prefill"
 import { prefillUnitResolver } from "@/lib/integration/normalise"
+import { SmartPrefillNotice } from "@/components/calculators/smart-prefill-notice"
+import { noticeLines, parseSmartProvenance, type NoticeLine } from "@/lib/smart/provenance"
+import { SMART_STALE_THRESHOLDS } from "@/lib/smart/env"
 import {
   buildReadyMessage,
   buildResultMessage,
@@ -66,13 +69,21 @@ function CalculatorRunnerInner({ calculatorId, embed }: { calculatorId: string; 
   valuesRef.current = values
   const handleCalculateRef = useRef<((override?: Record<string, string>) => Promise<void>) | null>(null)
   const prefillAppliedRef = useRef(false)
+  const [smartLines, setSmartLines] = useState<NoticeLine[]>([])
 
   // Deep links (?age=54&weight=70&creatinine=1.2&sex=male): each value is validated against its input; invalid or unknown
   // ones are ignored. Nothing is calculated unless the link also has calculate=1. Values are never logged or sent anywhere.
   useEffect(() => {
     if (!definition || prefillAppliedRef.current) return
     prefillAppliedRef.current = true
-    const prefill = parsePrefill(definition, new URLSearchParams(window.location.search), { unitResolver: prefillUnitResolver })
+    const params = new URLSearchParams(window.location.search)
+    // Values can also arrive in the URL fragment (SMART on FHIR). A fragment is never sent to a server; it is read once and removed from the address bar.
+    const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ""))
+    fragment.forEach((v, k) => params.set(k, v))
+    const prefill = parsePrefill(definition, params, { unitResolver: prefillUnitResolver })
+    if (prefill.applied.length > 0 && window.location.hash) window.history.replaceState(null, "", window.location.pathname + window.location.search)
+    const provenance = parseSmartProvenance(fragment)
+    if (provenance.fromSmart) setSmartLines(noticeLines(definition, provenance, prefill.applied, new Date(), SMART_STALE_THRESHOLDS))
     if (Object.keys(prefill.values).length === 0) return
     const merged = { ...defaultValues(definition), ...prefill.values }
     setValues(merged)
@@ -311,6 +322,7 @@ function CalculatorRunnerInner({ calculatorId, embed }: { calculatorId: string; 
         </CardHeader>
         <CardContent className="space-y-5">
           <ClinicalUseNotice category={definition.category} />
+          {smartLines.length > 0 ? <SmartPrefillNotice lines={smartLines} /> : null}
           <form
             className="space-y-5"
             onSubmit={(event) => {

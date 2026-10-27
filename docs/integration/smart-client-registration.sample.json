@@ -1,0 +1,24 @@
+{
+  "_comment": "SAMPLE ONLY. Not the format of any particular EHR: Epic, Oracle Health and Meditech each have their own registration form or API (see smart-on-fhir.md). Use this as the list of facts you will be asked for. Replace every placeholder.",
+  "client_name": "Clinexia clinical calculators",
+  "client_id": "<assigned by the EHR vendor, put it in NEXT_PUBLIC_SMART_CLIENT_ID>",
+  "client_type": "public",
+  "token_endpoint_auth_method": "none",
+  "grant_types": ["authorization_code"],
+  "pkce": "S256 (required)",
+  "launch_uri": "https://<clinexia-host>/smart/launch?calc=egfr-ckd-epi",
+  "redirect_uris": ["https://<clinexia-host>/smart/callback"],
+  "scope": "launch openid fhirUser patient/Patient.read patient/Observation.read",
+  "scope_standalone": "launch/patient openid fhirUser patient/Patient.read patient/Observation.read",
+  "fhir_versions": ["R4"],
+  "launch_types": ["EHR launch", "Standalone launch"],
+  "contacts": ["<support email>"],
+  "logo_uri": "<optional>",
+  "tos_uri": "<legal wording pending>",
+  "policy_uri": "<privacy policy URL; it needs wording for this use>",
+  "intended_use": "Calculation and reference aid for qualified clinicians (DRAFT wording, pending legal and regulatory review). Reads age, sex and recent results in the browser; nothing from the record is sent to Clinexia servers.",
+  "notes": [
+    "launch_uri: add ?calc=<calculator id> to choose the calculator (default egfr-ckd-epi) and &embed=1 to open the embedded view; the EHR appends iss and launch.",
+    "Only calculators with FHIR-coded inputs and outside the dosing and oncology categories can be launched."
+  ]
+}

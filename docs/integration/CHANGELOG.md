@@ -1,6 +1,6 @@
 # Formula changelog
 
-Every calculator has a formula version in `lib/calculators/versions.ts` (semver, all start at `1.0.0`). The API and the embed
+Every calculator has a formula version in `packages/core/src/calculators/versions.ts` (semver, all start at `1.0.0`). The API and the embed
 `postMessage` result carry it, so a partner can tell exactly which behaviour produced a number.
 
 ## What counts as a change, and the bump it needs
@@ -18,8 +18,8 @@ bumped**. That is deliberate: partners compare versions.
 
 1. Make the change.
 2. `pnpm test` fails with "Behaviour of these calculators changed but their version did not".
-3. Bump the version in `lib/calculators/versions.ts`.
-4. `pnpm integration:snapshots` (regenerates `lib/calculators/test-vector-data.ts` and `docs/integration/reference-gaps.md`).
+3. Bump the version in `packages/core/src/calculators/versions.ts`.
+4. `pnpm integration:snapshots` (regenerates `packages/core/src/calculators/test-vector-data.ts` and `docs/integration/reference-gaps.md`).
 5. Review the diff of `test-vector-data.ts`: only the calculators you meant to change should differ.
 6. Add an entry below, then commit all of it together.
 
@@ -28,7 +28,7 @@ A calculator with no version, or a version bump with stale vectors, also fails t
 
 ## What the test vectors are, and are not
 
-For each calculator the tests run 2 or 3 input sets (chosen by `buildVectorInputs` in `lib/calculators/test-vectors.ts`, or by
+For each calculator the tests run 2 or 3 input sets (chosen by `buildVectorInputs` in `packages/core/src/calculators/test-vectors.ts`, or by
 `VECTOR_OVERRIDES` where the generic choice does not work) with "today" fixed to 1 June 2026 and en-US number formatting, and compare a
 hash of the full results. The expected values were produced by running the calculators as they were on the day the baseline was
 taken. They detect **change**. They are not proof of correctness: nobody has clinically reviewed these particular input sets.

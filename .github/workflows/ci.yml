@@ -33,3 +33,5 @@ jobs:
         run: pnpm test
       - name: Production build
         run: pnpm build
+      - name: Build @clinexia/core
+        run: pnpm core:build

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { createHash } from "node:crypto"
 import { writeFileSync } from "node:fs"
-import { resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 import { calculators } from "./registry"
 import { FORMULA_VERSIONS } from "./versions"
 import { TEST_VECTORS } from "./test-vector-data"
@@ -28,10 +28,10 @@ function buildEntry(id: string, caseInputs: Record<string, string>[]): VectorEnt
   }
 }
 
-const DATA_FILE = resolve(process.cwd(), "lib/calculators/test-vector-data.ts")
+const DATA_FILE = fileURLToPath(new URL("./test-vector-data.ts", import.meta.url))
 
 describe("test vectors", () => {
-  it("regenerates lib/calculators/test-vector-data.ts when UPDATE_TEST_VECTORS=1 (pnpm integration:snapshots)", () => {
+  it("regenerates packages/core/src/calculators/test-vector-data.ts when UPDATE_TEST_VECTORS=1 (pnpm integration:snapshots)", () => {
     if (process.env.UPDATE_TEST_VECTORS !== "1") return
     const data: Record<string, VectorEntry> = {}
     for (const c of calculators) data[c.id] = buildEntry(c.id, buildVectorInputs(c))

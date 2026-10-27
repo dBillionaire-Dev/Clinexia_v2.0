@@ -7,7 +7,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { AppHeader, AppFooter } from "@/components/app-chrome"
 import { SITE_BOOTSTRAP } from "@/lib/site"
 import { CommandPalette } from "@/components/command-palette"
-import { InstallPrompt } from "@/components/install-prompt"
+import SmartInstall from "@/components/SmartInstall"
 import { ServiceWorkerRegistration } from "@/components/service-worker-registration"
 import { SkipToContent } from "@/components/skip-to-content"
 import { ApplyPreferences } from "@/components/apply-preferences"
@@ -170,7 +170,7 @@ export default function RootLayout({
                  <SiteChrome><AppFooter /></SiteChrome>
           </div>
           <SiteChrome><CommandPalette /></SiteChrome>
-          <SiteChrome><InstallPrompt /></SiteChrome>
+          <SmartInstall />
           <SiteChrome><ServiceWorkerRegistration /></SiteChrome>
           <SiteChrome><ApplyPreferences /></SiteChrome>
           <SiteChrome><AnalyticsSync /></SiteChrome>
