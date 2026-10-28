@@ -34,7 +34,9 @@ const IMPORT = /^\s*(?:import|export)\s+(?!type\b)[^;]*?from\s+["']([^"']+)["']|
 
 function resolveImport(spec: string, from: string): string | null {
   let base: string
-  if (spec.startsWith("@/")) base = resolve(root, spec.slice(2))
+  if (spec === "@clinexia/core") base = resolve(root, "packages/core/src/index")
+  else if (spec.startsWith("@clinexia/core/")) base = resolve(root, "packages/core/src", spec.slice("@clinexia/core/".length))
+  else if (spec.startsWith("@/")) base = resolve(root, spec.slice(2))
   else if (spec.startsWith(".")) base = resolve(dirname(from), spec)
   else return null // a package: not our code
   for (const c of [base, `${base}.ts`, `${base}.tsx`, join(base, "index.ts")]) if (existsSync(c) && statSync(c).isFile()) return c
@@ -66,6 +68,7 @@ describe("the public API never reaches analytics, history or usage tracking", ()
   it("crawls a meaningful part of the codebase (so the check below is not vacuous)", () => {
     expect(names.some((n) => n === "lib/calculators/registry.ts")).toBe(true)
     expect(names.some((n) => n === "lib/integration/normalise.ts")).toBe(true)
+    expect(names.some((n) => n === "packages/core/src/calculators/registry.ts")).toBe(true) // the crawl follows the shims into the package
     expect(names.length).toBeGreaterThan(40)
   })
 

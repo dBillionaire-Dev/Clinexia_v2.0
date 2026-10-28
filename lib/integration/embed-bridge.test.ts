@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
-import { buildReadyMessage, buildResultMessage, isTrustedParentMessage, parsePrefillMessage, postToParent } from "./embed-bridge"
+import { buildReadyMessage, buildResultMessage, formulaVersionFor, isTrustedParentMessage, parsePrefillMessage, postToParent } from "./embed-bridge"
+import { FORMULA_VERSIONS } from "@/lib/calculators/versions"
 
 const result = { value: 77.2, unit: "mL/min", display: "77.2 mL/min" }
 
@@ -46,5 +47,12 @@ describe("parsePrefillMessage", () => {
     for (const bad of [null, undefined, "x", 3, [], {}, { type: "result" }, { type: "prefill" }, { type: "prefill", values: [] }, { type: "prefill", values: "x" }]) {
       expect(parsePrefillMessage(bad)).toBeNull()
     }
+  })
+})
+
+describe("formulaVersionFor", () => {
+  it("is the calculator's formula version, or 'unversioned' for an unknown id", () => {
+    expect(formulaVersionFor("creatinine-clearance")).toBe(FORMULA_VERSIONS["creatinine-clearance"])
+    expect(formulaVersionFor("nope")).toBe("unversioned")
   })
 })

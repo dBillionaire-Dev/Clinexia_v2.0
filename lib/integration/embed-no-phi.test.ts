@@ -36,7 +36,7 @@ describe("embed path stays free of analytics and local persistence", () => {
     const layout = read("app/layout.tsx")
     expect(layout).toMatch(/<SiteChrome>\s*<AnalyticsSync \/>\s*<\/SiteChrome>/)
     expect(layout).toMatch(/<SiteChrome>\s*<UpdateWatcher \/>\s*<\/SiteChrome>/)
-    expect(read("components/site-chrome.tsx")).toContain("isEmbedPath")
+    expect(read("components/site-chrome.tsx")).toContain("isFramablePath")
   })
 
   it("the service worker never caches /embed or calculator URLs that carry a query string", () => {

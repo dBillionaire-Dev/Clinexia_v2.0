@@ -36,9 +36,11 @@ const nextConfig = {
     ]
     return [
       // Every route EXCEPT /embed keeps the existing framing rule (frame-ancestors 'self' + landing domain, or X-Frame-Options).
-      { source: "/((?!embed/|embed$).*)", headers: [...securityHeaders, ...FRAME_HEADERS] },
+      { source: "/((?!embed/|embed$|smart/|smart$).*)", headers: [...securityHeaders, ...FRAME_HEADERS] },
       // /embed gets the same security headers but no frame header here: proxy.ts sets frame-ancestors from the partner allowlist.
       { source: "/embed/:path*", headers: securityHeaders },
+      // /smart (SMART on FHIR launcher) may be opened inside an EHR: same rule as /embed.
+      { source: "/smart/:path*", headers: securityHeaders },
     ]
   },
   images: {

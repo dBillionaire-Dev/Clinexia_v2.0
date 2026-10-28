@@ -40,3 +40,6 @@ next-env.d.ts
 
 # keep the documented example env file
 !.env.example
+
+# @clinexia/core build output
+packages/core/dist/

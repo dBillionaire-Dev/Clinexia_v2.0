@@ -25,6 +25,12 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@clinexia/core": [
+        "./packages/core/src/index.ts"
+      ],
+      "@clinexia/core/*": [
+        "./packages/core/src/*"
       ]
     }
   },
@@ -36,6 +42,8 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "packages/core/dist",
+    ".clinexia-backup"
   ]
 }

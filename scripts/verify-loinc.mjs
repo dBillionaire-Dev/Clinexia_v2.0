@@ -33,7 +33,7 @@ const col = (name) => { const i = header.indexOf(name); if (i < 0) { console.err
 const iNum = col("LOINC_NUM"), iName = col("LONG_COMMON_NAME"), iStatus = col("STATUS")
 const table = new Map(rows.filter((r) => r.length > iStatus).map((r) => [r[iNum], { name: r[iName], status: r[iStatus] }]))
 
-const meta = await import(pathToFileURL(resolve("lib/calculators/coding-metadata.ts")).href)
+const meta = await import(pathToFileURL(resolve("packages/core/src/calculators/coding-metadata.ts")).href)
 const used = new Map() // code -> where
 const add = (code, where) => { if (code) used.set(code, [...(used.get(code) ?? []), where]) }
 for (const [calc, inputs] of Object.entries(meta.INPUT_CODING)) for (const [id, c] of Object.entries(inputs)) { add(c.loinc, `${calc}.${id}`); add(c.fhir?.loinc, `${calc}.${id} (fhir)`) }

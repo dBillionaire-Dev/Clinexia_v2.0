@@ -1,14 +1,2 @@
-import type { ConversionCategory } from "../types"
-
-export const timeConversion: ConversionCategory = {
-  id: "time",
-  name: "Time",
-  kind: "linear",
-  baseUnitId: "s",
-  units: [
-    { id: "s", name: "Seconds", symbol: "s", factor: 1 },
-    { id: "min", name: "Minutes", symbol: "min", factor: 60 },
-    { id: "h", name: "Hours", symbol: "h", factor: 3600 },
-    { id: "d", name: "Days", symbol: "d", factor: 86400 },
-  ],
-}
+// Moved to @clinexia/core (packages/core/src/conversions/data/time.ts). This file only re-exports it, so existing imports keep working.
+export * from "@clinexia/core/conversions/data/time"
