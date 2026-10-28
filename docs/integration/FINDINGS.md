@@ -16,19 +16,19 @@ _Kept up to date by every phase. Anything not verified is listed under UNVERIFIE
 
 ## UNVERIFIED items
 
-_None yet._
+See the consolidated section at the end of this file.
 
 ## Suspected formula issues (not fixed)
 
-_None yet._
+See the consolidated section at the end of this file.
 
 ## Reference gaps summary
 
-_Filled in by Phase 3._
+See the consolidated section at the end of this file.
 
 ## Decisions needed
 
-_Filled in by Phases 1-8._
+See the consolidated section at the end of this file.
 
 ## Phase 1 (prefill deep links and embed mode)
 
@@ -220,3 +220,67 @@ _Filled in by Phases 1-8._
 - **Reference ranges and flags** for calculated values: who supplies them.
 - **Validation ownership and evidence** (laboratory director, quality system), and whether this reference code is ever to be used as a basis for production.
 - The "already reported" code lists and `localCodeMap` per laboratory.
+
+## Baseline (consolidated)
+
+- Phase 0 recorded the starting point (install, typecheck, test, build) in the section above and removed the committed `*.bak*` files in their own commit. `supabase/analytics (2).sql` was flagged and **not** deleted.
+- The brief's baseline was 765 test cases. The run reported after Phases 1 to 7 passed typecheck, `vitest` (88 files, 1383 tests) and `next build`; the repository owner then applied the fixes for the core build (`DOM.Iterable` in `packages/core/tsconfig.json`) and the `core-js` build-script approval themselves. The final `pnpm core:build` and CI result are for the owner to confirm: they were not seen by the author of these documents.
+- No existing test was deleted or weakened. Tests that moved with their code in Phase 5 (to `packages/core/src`) give the same results; one assertion that depended on app code was relocated, not removed.
+
+## Consolidated UNVERIFIED index
+
+Detail for each item is in the phase sections above. These items were **not run or verified** by the author: nothing below was run against a real EHR, a real LIS, a live Supabase project, a real browser or the real npm registry.
+
+- **Codes and data:** every LOINC code (inputs, alternate identifiers, "already reported" lists) is written from memory and passes only the check-digit test (Phases 2, 6, 7). UCUM strings follow the specification but were not validated by a library. Run `scripts/verify-loinc.mjs` against a `Loinc.csv` from loinc.org.
+- **Embedding (Phase 1):** that `Cross-Origin-Opener-Policy` and `Cross-Origin-Resource-Policy` do not stop an allowlisted iframe (reasoned from the specifications). **The Definition-of-done check "the embed loads in an iframe from an allowlisted origin and is refused from another" has not been demonstrated in a browser**; the manual checklist is in `embed.md`.
+- **Public API (Phase 4):** the Supabase REST calls, `supabase/api-keys.sql` and the `api_record_usage` function against a live project; a live `curl`. (The brief's check that 88 umol/L gives the same creatinine clearance as the converted mg/dL value is demonstrated in-process by the test suite and in the documentation example, not against a deployment.) The per-instance rate limiter is not a global limit.
+- **Shared core (Phase 5):** the core build on every supported TypeScript version, the mobile repository (never seen), and publishing (nothing was published).
+- **SMART on FHIR and CDS Hooks (Phase 6):** the `fhirclient` option names and session layout, Observation search behaviour on real servers, sign-in inside an EHR iframe, every vendor requirement (Epic, Oracle Health, Meditech) and the SMART App Launcher sandbox steps. The CDS service does not verify the EHR's JWT.
+- **LIS / HL7 (Phase 7):** a real Mirth engine, `HttpURLConnection` from Rhino, whether a receiving LIS or EMR accepts a separate result message built this way, and the unit equivalences held in the adapter.
+- **Security (this phase):** nothing was penetration-tested or independently reviewed; `security.md` is a design description.
+- **Logs:** what a deployed host, CDN, proxy or monitoring tool records is outside what the tests can see (`no-phi-by-design.md`).
+
+## Suspected formula issues (consolidated; none fixed)
+
+No calculator formula, rounding or default was edited at any point. Things noticed, for a person to judge:
+
+- **Creatinine conversion factor.** The existing "Creatinine Unit Conversion" calculator uses 88.4; the conversion engine (used by the API, SMART and the LIS adapters) uses the molecular weight 113.12, which gives 88.40 to the fourth digit. 88 umol/L is 0.99546 mg/dL by the engine and 0.99548 by 88.4. Not an error; an inconsistency to decide on (Phase 2).
+- **eGFR.** The CKD-EPI calculator agrees with an independent implementation of the 2021 race-free equation to rounding on the sample used in the tests. That checks the arithmetic, not the choice of equation.
+- **No other suspected problems were found**, but the recorded test vectors only detect change; **nobody has clinically reviewed their inputs or confirmed the expected outputs**, and the high-risk dosing and oncology calculators in particular need known-answer cases from a clinical reviewer (Phase 3).
+
+## Reference gaps (consolidated)
+
+As generated in Phase 3 (`reference-gaps.md`): **no calculator has a `review-needed` reference**, so that file lists none. All Clinical Chemistry, Hematology, Laboratory Solutions, Spectrophotometry, Microbiology, Cardiovascular, Stem Cell and Oncology calculators are `supporting`, none `current`. If gaps were expected, the statuses in the reference tables are what to examine; nothing was edited to close or open a gap.
+
+## Decisions needed (consolidated)
+
+**Commercial and legal**
+
+- **Pricing and plans for API access.** Today any organisation owner or admin can create up to 10 keys; there is no plan check, no paid tier and no quota beyond the rate limit (Phase 4).
+- **Licence for the npm package** `@clinexia/core`, the registry (public npm, GitHub Packages, private) and whether to publish at all. Placeholder `UNLICENSED`; `prepublishOnly` refuses until decided (Phase 5).
+- **Regulatory review.** Whether the product, in each integration, is medical device software in the intended markets, and the wording of the intended-use statement (`intended-use.md` is a DRAFT), the disclaimer, terms of use and the privacy policy for the API, SMART launcher and CDS service (the privacy page does not mention API keys or per-key call counts yet).
+- **Data residency for Supabase.** Which region hosts the database that holds accounts, organisations, API key hashes, per-key call counts and the partner allowlist, and whether any partner or market requires a specific region or a contract. (The integration features are designed not to store patient data, but account and usage data are stored.)
+- **Partner onboarding process.** Who adds an origin to `embed_partners` or `EMBED_ALLOWED_ORIGINS`, who may create keys and grant the dosing scope, how a partner is verified, who registers the SMART client with each EHR and handles each hospital's activation, and what the agreement says.
+
+**Access and exposure**
+
+- **Browser-origin API keys.** Skipped: the API is server to server only, with no CORS. If a partner needs browser calls it needs a per-key flag and an origin allowlist.
+- **Who may grant `calculate:dosing`** (default: the organisation owner only), whether granting it needs a Clinexia review, and whether the supportive-care and cycle-progress oncology tools may move to the general scope.
+- **Whether dosing and oncology calculators may be embedded** by partners at all (the embed view allows them; only the API gates them).
+- **Whether `/smart` shares the `/embed` frame allowlist** or has its own.
+- **Versioning and deprecation notice period** for the API (proposed text in `api.md`) and the **rate limit** for production, with or without a shared store.
+
+**Clinical and content**
+
+- **Freshness limit for results other than creatinine and height** (90 days is a placeholder) and which results should be flagged at all.
+- **Clinical review of the test vectors**, who owns known-answer cases for dosing and oncology, and whether `supporting`-only calculators should be promoted to `current` once their sources are verified.
+- **Conversion factors:** the engine's molecular weights or the conventional rounded factors (88.4, 18.016, ...), whether mEq/L should be accepted for monovalent electrolytes, and whether inch and foot should be added to the public conversion tool.
+- **Formula versioning policy** (what counts as major, minor, patch; wording-only changes also bump) in `CHANGELOG.md`.
+
+**Standards and integrations**
+
+- **CDS Hooks:** who verifies the EHR's JWT (each EHR's issuer and key set) before the service is ever switched on.
+- **SMART:** which EHRs to register with first, and whether standalone launch (`launch/patient`) should be offered at all.
+- **LIS:** result status of calculated values (default `P`, preliminary), the code system for them (local or verified LOINC), calculate locally or send numbers to the API, the reconciliation policy when the analyser and Clinexia disagree, who supplies reference ranges and flags, and who owns validation and its evidence.
+- **Mobile:** how the mobile app gets `@clinexia/core` while it is private (tarball, shared workspace, private registry) and whether to delete the re-export shims once imports are migrated.
+- **Verified codes:** a pass of `scripts/verify-loinc.mjs` against loinc.org, and a UCUM validation, before any code is published to partners.
