@@ -55,6 +55,16 @@ Parameters:
 The same prefill parameters also work on the normal page, for example
 `/calculators/renal/creatinine-clearance?age=54&weight=70&creatinine=1.2&sex=male`.
 
+## Keeping patient values out of server logs
+
+A `?query` string is part of the request URL, so the web server, the CDN and the hosting provider's logs can see it. **Do not put patient values in the query string.** Put them after `#` (a fragment is never sent to a server) or send them with postMessage:
+
+```html
+<iframe src="https://CLINEXIA_HOST/embed/renal/creatinine-clearance?theme=light#age=54&weight=70&creatinine=1.2&sex=male" ...></iframe>
+```
+
+The calculator reads the fragment once and removes it from the address bar. Settings that are not patient data (`theme`, `postMessage`, `parentOrigin`) can stay in the query string. See `no-phi-by-design.md`.
+
 ## 3. postMessage contract
 
 Enabled with `?postMessage=1` and only when the parent origin is allowlisted. The embed never uses `"*"` as a target
