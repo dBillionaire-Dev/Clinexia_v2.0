@@ -155,7 +155,7 @@ export default function AboutPage() {
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">About Clinexia</h1>
           <p className="mt-3 text-xl font-medium text-primary sm:text-2xl">The clinical toolkit that is fast, shows its working, and is still there when the network is not.</p>
           <p className="mt-5 max-w-3xl text-lg leading-8 text-muted-foreground">
-            Clinexia is a client-side progressive web application designed by{" "}
+            Clinexia is a client-side progressive web application developed by{" "}
             <a className={A} href={DEVELOPER_URL} target="_blank" rel="noopener noreferrer">Ebenezer Ekunke</a>.
             It gathers the calculations healthcare and laboratory teams repeat every day into one place: medical calculators, drug dosing in mg and mL,
             unit conversions, bench tools and reference ranges, all running in your browser.
