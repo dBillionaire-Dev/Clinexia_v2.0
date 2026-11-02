@@ -9,7 +9,7 @@
  * functionality.
  */
 
-const CACHE_VERSION = "v5"
+const CACHE_VERSION = "v6" // clinexia-upgrade:phase3 asset precache
 const CACHE_PREFIX = "clinexia-"
 const SHELL_CACHE = `${CACHE_PREFIX}shell-${CACHE_VERSION}`
 const RUNTIME_CACHE = `${CACHE_PREFIX}runtime-${CACHE_VERSION}`
@@ -194,6 +194,12 @@ const CALCULATOR_ROUTES = [
   "/calculators/cardiovascular/cardiac-index",
   "/calculators/cardiovascular/has-bled",
   "/calculators/cardiovascular/af-ventricular-rate",
+  "/calculators/general/qsofa", // clinexia-upgrade:phase4 routes (404 until approved: reported as skipped, not failed)
+  "/calculators/general/sofa",
+  "/calculators/general/pecarn-head-injury-under-2",
+  "/calculators/general/pecarn-head-injury-2-to-17",
+  "/calculators/chemistry/ldl-sampson",
+  "/calculators/hematology/blood-volume-nadler-lemmens",
   "/calculators/stem-cell-transplant/hct-ci",
   "/calculators/stem-cell-transplant/conditioning-transplant-day",
   "/calculators/stem-cell-transplant/stem-cell-collection-yield",
@@ -243,35 +249,111 @@ const PRECACHE_URLS = [
 ]
 
 
+// clinexia-upgrade:phase3 install
+// Precache in three steps so an offline cold start works for pages that were never opened:
+//   1. every configured page (HTML),
+//   2. every /_next/static JS and CSS file those pages reference (found by reading the cached HTML),
+//   3. any calculator pages linked from the category pages that are not in the configured list yet.
+// Requests are limited to a few at a time. The outcome is stored at STATUS_URL so the app can say honestly
+// whether the offline copy is complete. A 404 is "skipped" (the page does not exist in this build), not "failed".
+const STATUS_URL = "/__precache-status.json"
+const MAX_RUNTIME_ENTRIES = 600
+const PRECACHE_CONCURRENCY = 6
+
+function extractStaticAssets(html) {
+  const found = new Set()
+  const pattern = /(?:src|href)="(\/_next\/static\/[^"\s<>]+)"/g
+  let match
+  while ((match = pattern.exec(html)) !== null) found.add(match[1].replace(/&amp;/g, "&"))
+  return [...found]
+}
+
+function extractCalculatorLinks(html) {
+  const found = new Set()
+  const pattern = /href="(\/calculators\/[a-z0-9-]+\/[a-z0-9-]+)"/g
+  let match
+  while ((match = pattern.exec(html)) !== null) found.add(match[1])
+  return [...found]
+}
+
+async function runPool(items, limit, worker) {
+  let next = 0
+  const lane = async () => {
+    while (next < items.length) {
+      const item = items[next]
+      next += 1
+      try {
+        await worker(item)
+      } catch {
+        // each worker records its own failure
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, lane))
+}
+
+async function trimCache(cache, max) {
+  const keys = await cache.keys()
+  for (let i = 0; i < keys.length - max; i += 1) await cache.delete(keys[i])
+}
+
+async function precacheOne(cache, url, report, found) {
+  try {
+    const response = await fetch(new Request(url, { cache: "reload", credentials: "same-origin" }))
+    if (response.status === 404) {
+      report.skipped.push(url)
+      return
+    }
+    if (!isCacheableResponse(response)) {
+      report.failed.push(url)
+      return
+    }
+    const type = (response.headers && response.headers.get && response.headers.get("content-type")) || ""
+    if (found && type.includes("text/html")) {
+      const html = await response.clone().text()
+      for (const asset of extractStaticAssets(html)) found.assets.add(asset)
+      for (const link of extractCalculatorLinks(html)) found.pages.add(link)
+    }
+    await cache.put(url, response)
+    report.cached += 1
+  } catch {
+    report.failed.push(url)
+  }
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
       const cache = await caches.open(SHELL_CACHE)
+      const report = { cached: 0, failed: [], skipped: [] }
+      const found = { assets: new Set(), pages: new Set() }
 
-      await Promise.all(
-        PRECACHE_URLS.map(async (url) => {
-          try {
-            const request = new Request(url, {
-              cache: "reload",
-              credentials: "same-origin",
-            })
+      await runPool(PRECACHE_URLS, PRECACHE_CONCURRENCY, (url) => precacheOne(cache, url, report, found))
 
-            const response = await fetch(request)
+      const known = new Set(PRECACHE_URLS)
+      const extraPages = [...found.pages].filter((url) => !known.has(url))
+      await runPool(extraPages, PRECACHE_CONCURRENCY, (url) => precacheOne(cache, url, report, found))
 
-            // Cache successful, same-origin responses only.
-            if (
-              response.ok &&
-              response.type === "basic" &&
-              new URL(response.url).origin === self.location.origin
-            ) {
-              await cache.put(url, response)
-            }
-          } catch {
-            // A failed route should not prevent installation.
-            // Check failed routes during offline testing.
-          }
-        }),
-      )
+      await runPool([...found.assets], PRECACHE_CONCURRENCY, (url) => precacheOne(cache, url, report, null))
+
+      try {
+        await cache.put(
+          STATUS_URL,
+          new Response(
+            JSON.stringify({
+              version: CACHE_VERSION,
+              completedAt: new Date().toISOString(),
+              cached: report.cached,
+              failed: report.failed,
+              skipped: report.skipped.length,
+              assets: found.assets.size,
+            }),
+            { headers: { "Content-Type": "application/json" } },
+          ),
+        )
+      } catch {
+        // status is informational only
+      }
 
       await self.skipWaiting()
     })(),
@@ -437,6 +519,7 @@ async function cacheResponse(cacheName, request, response) {
 
   const cache = await caches.open(cacheName)
   await cache.put(request, response.clone())
+  if (cacheName === RUNTIME_CACHE) await trimCache(cache, MAX_RUNTIME_ENTRIES) // clinexia-upgrade:phase3 trim
 }
 
 async function matchAppCache(request) {
@@ -474,10 +557,7 @@ async function handleNavigation(request) {
 
     return response
   } catch {
-    const home = await matchAppCache("/")
-
-    if (home) return home
-
+    // clinexia-upgrade:phase3 offline-fallback: never answer another page's URL with the home page.
     return new Response(
       `<!doctype html>
       <html lang="en">

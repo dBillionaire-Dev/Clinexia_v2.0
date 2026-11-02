@@ -152,3 +152,70 @@ export function lookupBand(calculatorId: string, value: number, inputs: Record<s
   if (!isReleased(`${calculatorId}:bands`)) return { band: null, withheld: true }
   return { band: findBand(record.bands, value, inputs), withheld: false }
 }
+
+// clinexia-upgrade:phase4 evidence — records for the tools in the calculator library's clinical-modules folder.
+// They are registered here, in the app layer, because the library itself cannot hold sources or review text.
+// Source links marked "search" open a PubMed search because no identifier was verified; replace with a DOI or PMID when you have one.
+const SAMPSON_2020: EvidenceSource = {
+  title: "Sampson et al. 2020: new equation for calculated LDL-C (NIH equation)",
+  citation: "Sampson M, Ling C, Sun Q, et al. JAMA Cardiol. 2020;5(5):540-548.",
+  url: "https://doi.org/10.1001/jamacardio.2020.0013",
+}
+const NADLER_1962: EvidenceSource = {
+  title: "Nadler et al. 1962: prediction of blood volume in normal human adults (PubMed search)",
+  citation: "Nadler SB, Hidalgo JH, Bloch T. Surgery. 1962;51(2):224-232.",
+  url: "https://pubmed.ncbi.nlm.nih.gov/?term=Nadler+Hidalgo+Bloch+prediction+of+blood+volume+in+normal+human+adults",
+}
+const LEMMENS_2006: EvidenceSource = {
+  title: "Lemmens et al. 2006: estimating blood volume in obese and morbidly obese patients (PubMed search)",
+  citation: "Lemmens HJM, Bernstein DP, Brodsky JB. Obes Surg. 2006;16(6):773-776.",
+  url: "https://pubmed.ncbi.nlm.nih.gov/?term=Lemmens+Bernstein+Brodsky+estimating+blood+volume+in+obese+and+morbidly+obese+patients",
+}
+
+registerEvidence({
+  calculatorId: "qsofa",
+  resultKind: "screening-score",
+  intendedPopulation: "Adults with suspected infection outside the ICU.",
+  notIntendedFor: ["Children", "Use as the only sepsis screening tool"],
+  sources: [SEYMOUR_2016, SINGER_2016, SSC_2026],
+  limitations: ["Insensitive as a rule-out. The 2026 Surviving Sepsis Campaign guideline recommends other tools (NEWS, NEWS2, MEWS, SIRS) over qSOFA as a single screening tool."],
+  contentVersion: "2026-10-26.1",
+})
+registerEvidence({
+  calculatorId: "sofa",
+  resultKind: "severity-score",
+  intendedPopulation: "Adults with suspected or confirmed infection, to describe organ dysfunction.",
+  notIntendedFor: ["Children", "Stand-alone diagnosis of sepsis"],
+  sources: [VINCENT_1996, SINGER_2016, SSC_2026],
+  limitations: ["Needs a baseline score to apply the Sepsis-3 definition (acute change of 2 or more points)."],
+  contentVersion: "2026-10-26.1",
+})
+for (const [id, pop] of [["pecarn-head-injury-under-2", "Children under 2 years"], ["pecarn-head-injury-2-to-17", "Children aged 2 to under 18 years"]] as const) {
+  registerEvidence({
+    calculatorId: id,
+    resultKind: "decision-rule",
+    intendedPopulation: `${pop} with blunt head trauma within 24 hours and GCS 14 to 15.`,
+    notIntendedFor: ["Penetrating trauma", "GCS below 14", "Known brain tumor, ventricular shunt, bleeding disorder, or neuroimaging already done"],
+    sources: [KUPPERMANN_2009],
+    limitations: ["Risk percentages come from the derivation and validation data and describe groups, not an individual child."],
+    contentVersion: "2026-10-26.1",
+  })
+}
+registerEvidence({
+  calculatorId: "ldl-sampson",
+  resultKind: "calculation",
+  intendedPopulation: "Adults with a lipid panel when a direct LDL measurement is not available, including when triglycerides are above the Friedewald limit. Validated for triglycerides up to 800 mg/dL (9.0 mmol/L).",
+  notIntendedFor: ["Triglycerides above 800 mg/dL (9.0 mmol/L): use a direct LDL measurement"],
+  sources: [SAMPSON_2020],
+  limitations: ["An estimate, not a measured value. A direct LDL measurement is preferred when triglycerides are high."],
+  contentVersion: "2026-10-26.1",
+})
+registerEvidence({
+  calculatorId: "blood-volume-nadler-lemmens",
+  resultKind: "calculation",
+  intendedPopulation: "Adults (18 years or over), for an estimate of total blood volume. Lemmens is intended to cover obesity as well.",
+  notIntendedFor: ["Children and neonates", "Pregnancy"],
+  sources: [NADLER_1962, LEMMENS_2006],
+  limitations: ["Population equations: individual blood volume varies.", "Red cell and plasma volume use the venous PCV as entered. Whole-body hematocrit is generally lower, so that split is approximate."],
+  contentVersion: "2026-10-26.1",
+})
