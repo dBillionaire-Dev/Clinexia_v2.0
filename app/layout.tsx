@@ -13,6 +13,7 @@ import { SkipToContent } from "@/components/skip-to-content"
 import { ApplyPreferences } from "@/components/apply-preferences"
 import { AnalyticsSync } from "@/components/analytics-sync"
 import { UpdateWatcher } from "@/components/update-watcher"
+import { EmergencyFab } from "@/components/emergency/emergency-fab" // clinexia-upgrade:phase6 emergency
 import { OfflineIndicator } from "@/components/offline-indicator" // clinexia-upgrade:phase3 offline
 import { DiagnosticsShortcut } from "@/components/diagnostics-shortcut"
 import { SiteChrome } from "@/components/site-chrome"
@@ -176,6 +177,7 @@ export default function RootLayout({
           <SiteChrome><ApplyPreferences /></SiteChrome>
           <SiteChrome><AnalyticsSync /></SiteChrome>
           <SiteChrome><UpdateWatcher /></SiteChrome>
+          <EmergencyFab />
           <SiteChrome><OfflineIndicator /></SiteChrome>
           <SiteChrome><DiagnosticsShortcut /></SiteChrome>
           <Toaster />

@@ -17,6 +17,7 @@ export type ReviewState =
 export const CLINICAL_REVIEWS: Record<string, ReviewState> = {
   "cha2ds2-vasc:bands": { status: "pending" },
   "has-bled:bands": { status: "pending" },
+  "emergency-doses": { status: "pending" }, // clinexia-upgrade:phase6
 }
 
 export function previewEnabled(): boolean {

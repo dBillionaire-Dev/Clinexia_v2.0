@@ -28,6 +28,7 @@ const STATIC_ROUTES = [
   "/conversions/mass-volume",
   "/conversions/molar-mass",
   "/estimators",
+  "/emergency", // clinexia-upgrade:phase6 must work offline
   "/favorites",
   "/history",
   "/lab-tools",
