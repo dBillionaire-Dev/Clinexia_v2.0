@@ -40,7 +40,7 @@ export const ldlCalculator: CalculatorDefinition = {
         value: "N/A",
         display: "Not valid. TG too high!!!",
         warnings: [
-          "The Friedewald equation is unreliable when triglycerides exceed ~400 mg/dL (4.5 mmol/L). Use direct LDL measurement instead.",
+          "The Friedewald equation is unreliable when triglycerides exceed ~400 mg/dL (4.5 mmol/L). Use direct LDL measurement or Sampson equation instead.",
         ],
       }
     }
