@@ -9,6 +9,7 @@ import { getCalculatorById } from "@/lib/calculators/registry"
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Star } from "lucide-react"
+import { CollectionsManager } from "@/components/collections-manager" // clinexia-upgrade:phase1 collections
 
 export default function FavoritesPage() {
   const [ids, setIds] = useState<string[]>([])
@@ -51,6 +52,7 @@ export default function FavoritesPage() {
           ))}
         </div>
       )}
+      <CollectionsManager />
     </PageContainer>
   )
 }

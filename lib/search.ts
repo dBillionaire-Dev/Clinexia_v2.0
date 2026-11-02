@@ -2,6 +2,7 @@ import { calculators } from "./calculators/registry"
 import { CALCULATOR_CATEGORY_LABELS, CALCULATOR_SUBCATEGORY_LABELS } from "./calculators/types"
 import { conversionCategories } from "./conversions/registry"
 import { labTools } from "./lab-tools-registry"
+import { getToolSynonyms, hasExactSynonym } from "./clinical/tool-synonyms" // clinexia-upgrade:phase1 synonyms
 
 export interface SearchResult {
   id: string
@@ -108,6 +109,7 @@ function calculatorSearchText(c: SearchableCalculator): string[] {
     CALCULATOR_CATEGORY_LABELS[c.category],
     subcategory,
     ...(c.keywords ?? []),
+    ...getToolSynonyms(c.id),
   ].join(" "))
 }
 
@@ -188,7 +190,7 @@ export function searchCalculators(query: string): SearchableCalculator[] {
   const ranked = calculators
     .map((calculator) => ({ calculator, score: scoreCalculator(calculator, queryTokens) }))
     .filter(({ score }) => score > 0)
-    .sort((a, b) => b.score - a.score || a.calculator.name.localeCompare(b.calculator.name))
+    .sort((a, b) => Number(hasExactSynonym(b.calculator.id, query)) - Number(hasExactSynonym(a.calculator.id, query)) || b.score - a.score || a.calculator.name.localeCompare(b.calculator.name))
     .map(({ calculator }) => calculator)
 
   // A query naming several clinical concepts ("pediatric antimalarial") is an
