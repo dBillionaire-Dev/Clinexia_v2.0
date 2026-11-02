@@ -25,6 +25,8 @@ export const TOOL_SYNONYMS: Record<string, string[]> = {
   "estimated-osmolality": ["osmolality", "osmolarity", "osmolal gap"],
   "hba1c-eag": ["a1c", "glycated hemoglobin", "average glucose"],
   "red-cell-indices": ["mcv", "mch", "mchc", "cbc", "anemia"],
+  "ldl-sampson": ["sampson", "nih ldl", "ldl high triglycerides", "hypertriglyceridemia", "calculated ldl"],
+  "blood-volume-nadler-lemmens": ["nadler", "lemmens", "ebv", "total blood volume", "red cell volume", "plasma volume", "pcv", "hematocrit"],
   qsofa: ["quick sofa", "sepsis screen", "sepsis"],
   sofa: ["sequential organ failure", "sepsis", "icu", "organ failure"],
   "pecarn-head-injury-under-2": ["pecarn", "head injury", "head trauma", "child", "infant", "ct head"],

@@ -44,7 +44,7 @@ describe("collections", () => {
 
 describe("tool synonyms", () => {
   // Tools that arrive in later phases may not be registered yet; they are allowed here so this test passes in every phase.
-  const upcoming = ["qsofa", "sofa", "pecarn-head-injury-under-2", "pecarn-head-injury-2-to-17"]
+  const upcoming = ["qsofa", "sofa", "pecarn-head-injury-under-2", "pecarn-head-injury-2-to-17", "ldl-sampson", "blood-volume-nadler-lemmens"]
   it("only reference real tools, so the list cannot silently drift", () => {
     const known = new Set([...calculators.map((c) => c.id), ...upcoming])
     for (const id of Object.keys(TOOL_SYNONYMS)) expect(known.has(id), id).toBe(true)
