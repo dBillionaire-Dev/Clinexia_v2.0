@@ -21,7 +21,13 @@ export const CLINICAL_MODULE_REVIEWS: Record<string, ModuleReview> = {
   sofa: { status: "pending" },
   "pecarn-head-injury-under-2": { status: "pending" },
   "pecarn-head-injury-2-to-17": { status: "pending" },
-  "ldl-sampson": { status: "pending" },
+  "ldl-sampson": {
+    status: "approved",
+    reviewer: "MLS. Ekunke, E. U.",
+    credentials: "BMLS AMLSN",
+    reviewedAt: "2026-11-02",
+    scope: "Reviewed Sampson LDL formula vs 2021 NIH paper, evidence links, input bounds, test vectors",
+  },
   "blood-volume-nadler-lemmens": { status: "pending" },
 }
 

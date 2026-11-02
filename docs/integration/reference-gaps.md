@@ -10,7 +10,7 @@ this is a worklist for whoever owns the clinical content.
 |---|---|---|---|---|
 | General | 15 | 7 | 8 | 0 |
 | Renal | 6 | 6 | 0 | 0 |
-| Clinical Chemistry | 15 | 0 | 15 | 0 |
+| Clinical Chemistry | 16 | 0 | 16 | 0 |
 | Hematology | 12 | 0 | 12 | 0 |
 | Laboratory Solutions | 6 | 0 | 6 | 0 |
 | Spectrophotometry | 11 | 0 | 11 | 0 |

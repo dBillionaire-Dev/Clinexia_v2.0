@@ -4923,5 +4923,38 @@ export const TEST_VECTORS: Record<string, VectorEntry> = {
       }
     ],
     "hash": "59ba71d66fb8e9197089e40bb361fda1ca84275edf31c62e5bd5c5f9570b7b31"
+  },
+  "ldl-sampson": {
+    "version": "1.0.0",
+    "cases": [
+      {
+        "inputs": {
+          "unit": "mg/dL",
+          "tc": "10",
+          "hdl": "10",
+          "tg": "10"
+        },
+        "display": "-10.4 mg/dL"
+      },
+      {
+        "inputs": {
+          "unit": "mmol/L",
+          "tc": "10",
+          "hdl": "10",
+          "tg": "10"
+        },
+        "display": "error: The Sampson equation is validated only up to triglycerides of 800 mg/dL (9.0 mmol/L). Above that, use a direct LDL measurement. No value is given."
+      },
+      {
+        "inputs": {
+          "unit": "mg/dL",
+          "tc": "15",
+          "hdl": "15",
+          "tg": "15"
+        },
+        "display": "-10.8 mg/dL"
+      }
+    ],
+    "hash": "c78babca236358bcb5c0f9c45aef8585c9add9303c61e4e1309c44300d0fe655"
   }
 }
