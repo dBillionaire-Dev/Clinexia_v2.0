@@ -40,3 +40,7 @@ For high-risk (dosing, oncology) calculators a clinical reviewer should add hand
 
 Baseline versions recorded for every calculator in the registry; test vectors generated from current behaviour. No formula,
 rounding or default was changed to produce this baseline.
+
+### 1.0.1 - ldl-friedewald (patch, 2026-11-02)
+
+High-triglyceride warning now points to the Sampson equation; results unchanged

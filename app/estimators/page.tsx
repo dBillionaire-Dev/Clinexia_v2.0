@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 import { PageContainer } from "@/components/page-container"
 import { AccessBadge } from "@/components/account/access-badge"
@@ -6,7 +7,10 @@ import type { CalculatorGroup } from "@/lib/calculators/types"
 import { CALCULATOR_CATEGORY_LABELS } from "@/lib/calculators/types"
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 
-export const metadata = { title: "Clinical Estimators" }
+export const metadata: Metadata = {
+  title: "Clinical Estimators",
+  alternates: { canonical: "/estimators" },
+}
 
 // Estimators are grouped by clinical purpose rather than the raw data
 // category, anthropometric/energy estimates (BSA, IBW, BMR, TDEE) read

@@ -36,6 +36,13 @@ export const labTools: LabToolEntry[] = [
     keywords: ["percentage", "w/v", "v/v", "w/w", "solution"],
   },
   {
+    id: "height-converter",
+    name: "Height Converter",
+    description: "cm, m, mm, ft, in and feet + inches",
+    href: "/conversions/height",
+    keywords: ["height", "cm to feet", "cm to ft", "feet to cm", "inches to cm", "cm to inches", "ft in", "feet and inches", "m to ft", "stature"],
+  },
+  {
     id: "mass-volume",
     name: "Mass ↔ Volume",
     description: "Density-based conversion by substance",

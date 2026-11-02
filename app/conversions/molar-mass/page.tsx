@@ -1,7 +1,7 @@
 import { PageContainer } from "@/components/page-container"
 import { MolarMassConverter } from "@/components/conversions/molar-mass-converter"
 
-export const metadata = { title: "Molar ↔ Mass Concentration - Clinexia" }
+export const metadata = { title: "Molar ↔ Mass Concentration - Clinexia", alternates: { canonical: "/conversions/molar-mass" } }
 
 export default function MolarMassPage() {
   return (

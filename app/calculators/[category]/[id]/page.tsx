@@ -4,6 +4,8 @@ import { PageContainer } from "@/components/page-container"
 import { calculators, getCalculatorById } from "@/lib/calculators/registry"
 import { CalculatorRunner } from "@/components/calculators/calculator-runner"
 
+export const dynamicParams = false
+
 export function generateStaticParams() {
   return calculators.map((c) => ({ category: c.category, id: c.id }))
 }

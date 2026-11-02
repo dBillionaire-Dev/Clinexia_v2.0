@@ -18,6 +18,11 @@ describe("globalSearch", () => {
     expect(globalSearch("mass ↔ volume").length).toBeGreaterThanOrEqual(0) // symbol variants shouldn't throw
   })
 
+  it("finds the height converter by common phrases", () => {
+    expect(globalSearch("height converter").some((r) => r.id === "height-converter")).toBe(true)
+    expect(globalSearch("cm to feet").some((r) => r.id === "height-converter")).toBe(true)
+  })
+
   it("finds the combined Red Cell Indices tool by MCV/MCH/MCHC keywords", () => {
     expect(globalSearch("mcv").some((r) => r.id === "red-cell-indices")).toBe(true)
     expect(globalSearch("mchc").some((r) => r.id === "red-cell-indices")).toBe(true)
