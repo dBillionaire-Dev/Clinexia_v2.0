@@ -15,6 +15,10 @@ export type ReviewState =
   | { status: "approved"; reviewer: string; credentials: string; reviewedAt: string; scope: string; notes?: string }
 
 export const CLINICAL_REVIEWS: Record<string, ReviewState> = {
+  "pediatric-sheets:tachycardia": { status: "pending" }, // clinexia-upgrade:phase10
+  "pediatric-sheets:shock-fluids": { status: "pending" },
+  "pediatric-sheets:anaphylaxis": { status: "pending" },
+  "pediatric-sheets:seizure": { status: "pending" },
   "emergency-weight-estimation": { status: "pending" }, // clinexia-upgrade:phase9
   "patient:bmi": { status: "pending" }, // clinexia-upgrade:phase8
   "patient:egfr-ckd-epi": { status: "pending" },

@@ -5,7 +5,7 @@ import fs from "node:fs"
 import path from "node:path"
 
 const root = path.resolve(import.meta.dirname, "..")
-const files = ["lib/clinical/evidence.ts", "lib/clinical/modules/qsofa.ts", "lib/clinical/modules/sofa.ts", "lib/clinical/modules/pecarn.ts", "lib/emergency/dose-data.ts", "lib/emergency/weight-estimate.ts"] /* clinexia-upgrade:phase9 */ /* clinexia-upgrade:phase6 */
+const files = ["lib/clinical/evidence.ts", "lib/clinical/modules/qsofa.ts", "lib/clinical/modules/sofa.ts", "lib/clinical/modules/pecarn.ts", "lib/emergency/dose-data.ts", "lib/pediatric/sheets-data.ts" /* clinexia-upgrade:phase10 */, "lib/emergency/weight-estimate.ts"] /* clinexia-upgrade:phase9 */ /* clinexia-upgrade:phase6 */
 const urls = new Set()
 for (const f of files) {
   const p = path.join(root, f)

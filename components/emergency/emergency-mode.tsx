@@ -8,6 +8,7 @@ import { AGE_GROUP_LABEL, buildDashboard, type AgeGroup, type DoseLine, type Ton
 import { DOSE_DATA_VERSION, EMERGENCY_SOURCES, WEIGHT_LIMITS } from "@/lib/emergency/dose-data"
 import { parseStrictNumber } from "@/lib/clinical/input-validation"
 import { isReleased, previewEnabled } from "@/lib/clinical/review"
+import { PediatricSheets } from "@/components/emergency/pediatric-sheets" // clinexia-upgrade:phase10 sheets
 import { WeightEstimator, type EstimateChoice } from "@/components/emergency/weight-estimator" // clinexia-upgrade:phase9 estimate
 
 const TONE: Record<Tone, string> = {
@@ -109,6 +110,7 @@ export function EmergencyMode({ onExit }: { onExit: () => void }) {
                   </section>
                 ))}
                 {dashboard.warnings.map((w) => <p key={w} className="text-sm text-zinc-300">{w}</p>)}
+                {group === "pediatric" && weight !== null ? <PediatricSheets weightKg={weight} /> : null}
               </div>
             ) : null}
 
