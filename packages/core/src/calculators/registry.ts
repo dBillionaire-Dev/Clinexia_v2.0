@@ -1,5 +1,6 @@
 import type { CalculatorDefinition, CalculatorGroup } from "./types"
 import { withDoseVolume } from "./dose-volume"
+import { getApprovedClinicalModules } from "./clinical-modules/index" // clinexia-upgrade:phase4 modules
 import { withCodingMetadata } from "./coding-metadata"
 import {
   dailyWaterIntakeCalculator,
@@ -319,7 +320,7 @@ const baseCalculators: CalculatorDefinition[] = [
 ]
 
 /** Every calculator, with the optional product-strength inputs and mL-per-dose output added where they apply. */
-export const calculators: CalculatorDefinition[] = baseCalculators.map(withDoseVolume).map(withCodingMetadata)
+export const calculators: CalculatorDefinition[] = [...baseCalculators, ...getApprovedClinicalModules()].map(withDoseVolume).map(withCodingMetadata)
 
 export function getCalculatorById(id: string): CalculatorDefinition | undefined {
   return calculators.find((c) => c.id === id)
