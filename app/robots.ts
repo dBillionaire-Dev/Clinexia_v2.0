@@ -1,9 +1,11 @@
 import type { MetadataRoute } from "next"
 
+const BASE_URL = "https://www.clinexia.app"
+
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://convertlab-nex.vercel.app"
   return {
     rules: [{ userAgent: "*", allow: "/" }],
-    sitemap: `${baseUrl.replace(/\/$/, "")}/sitemap.xml`,
+    sitemap: `${BASE_URL}/sitemap.xml`,
+    host: BASE_URL,
   }
 }

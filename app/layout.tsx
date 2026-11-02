@@ -21,7 +21,7 @@ import { SiteChrome } from "@/components/site-chrome"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.clinexia.app"),
+  metadataBase: new URL("https://www.clinexia.app"),
   title: {
     default: "Clinexia | Clinical Calculators, Drug Dosing and Unit Conversions",
     template: "%s | Clinexia",
@@ -53,7 +53,6 @@ export const metadata: Metadata = {
   ],
   applicationName: "Clinexia",
   category: "health",
-  alternates: { canonical: "/" },
   robots: { index: true, follow: true },
   openGraph: {
     type: "website",
@@ -91,7 +90,7 @@ function ClinexiaJsonLd() {
     "@graph": [
       {
         "@type": "SoftwareApplication",
-        "@id": "https://clinexia.app",
+        "@id": "https://www.clinexia.app",
         "name": "Clinexia Clinical Toolkit",
         "applicationCategory": "MedicalApplication",
         "operatingSystem": "Windows, iOS, Android, Web Browser",
@@ -104,14 +103,14 @@ function ClinexiaJsonLd() {
         "author": {
           "@type": "Person",
           "name": "Ebenezer Ekunke",
-          "url": "https://is-a.dev"
+          "url": "https://github.com/dBillionaire-Dev"
         },
         "description": "An offline-first progressive web app clinical toolkit featuring pediatric weight-based drug dosing calculators, medical unit converters, and automated EHR clinical note formatting.",
         "features": "Offline local database syncing via IndexedDB, automated EHR note formatting, weight-based pediatric safety guardrails"
       },
       {
         "@type": "MedicalWebPage",
-        "@id": "https://clinexia.app",
+        "@id": "https://www.clinexia.app",
         "url": "https://www.clinexia.app",
         "name": "Clinexia | Offline Clinical Toolkit & Drug Dosing Calculator",
         "description": "Professional medical calculator for healthcare workers. Calculate pediatric dosages, convert laboratory units, and generate clinical notes completely offline.",

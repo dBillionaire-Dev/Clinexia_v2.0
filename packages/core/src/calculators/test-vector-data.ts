@@ -627,7 +627,7 @@ export const TEST_VECTORS: Record<string, VectorEntry> = {
     "hash": "4cc8be578ea6eb0b0743a94ed1d80b00b468cd7341451db45b922e15553f49af"
   },
   "ldl-friedewald": {
-    "version": "1.0.0",
+    "version": "1.0.1",
     "cases": [
       {
         "inputs": {
@@ -657,7 +657,7 @@ export const TEST_VECTORS: Record<string, VectorEntry> = {
         "display": "180 mg/dL"
       }
     ],
-    "hash": "9042db1b937afb69523098233a113e0cd40eec6ff3842b62cc523216f12fddd9"
+    "hash": "9876d2e202dfe49b8fe9bcd7d542593f1402f6c843c60326f66b09747bcaca28"
   },
   "non-hdl-cholesterol": {
     "version": "1.0.0",

@@ -8,6 +8,8 @@ import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/ca
 import { Badge } from "@/components/ui/badge"
 import { AccessBadge } from "@/components/account/access-badge"
 
+export const dynamicParams = false
+
 export function generateStaticParams() {
   return calculatorCatalog.map((c) => ({ category: c.id }))
 }

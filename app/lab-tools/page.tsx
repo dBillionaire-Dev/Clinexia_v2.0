@@ -1,9 +1,13 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 import { PageContainer } from "@/components/page-container"
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Droplets, FlaskConical, Percent, Layers, Bug, Waves } from "lucide-react"
 
-export const metadata = { title: "Laboratory Tools" }
+export const metadata: Metadata = {
+  title: "Laboratory Tools",
+  alternates: { canonical: "/lab-tools" },
+}
 
 const labTools = [
   { href: "/lab-tools/dilution", label: "C1V1 = C2V2 Dilution", description: "Solve for concentration or volume", icon: Droplets },
