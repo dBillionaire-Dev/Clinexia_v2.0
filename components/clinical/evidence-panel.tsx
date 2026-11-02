@@ -5,6 +5,7 @@ import type { CalculationResult } from "@/lib/calculators/types"
 import { RESULT_KIND_TEXT, getEvidence, lookupBand } from "@/lib/clinical/evidence"
 import { reviewSummary } from "@/lib/clinical/review"
 import { getSuggestions } from "@/lib/clinical/suggestions"
+import { PlainLanguagePanel } from "@/components/clinical/plain-language-panel" // clinexia-upgrade:phase8 plain
 import Link from "next/link"
 import { Separator } from "@/components/ui/separator"
 
@@ -21,7 +22,8 @@ export function EvidencePanel({ calculatorId, result, inputs }: { calculatorId: 
       ))}
     </div>
   ) : null
-  if (!record) return suggestionBlock
+  const plain = <PlainLanguagePanel calculatorId={calculatorId} result={result} />
+  if (!record) return <>{suggestionBlock}{plain}</>
   const numeric = typeof result.value === "number" ? result.value : null
   const lookup = numeric === null ? { band: null, withheld: false } : lookupBand(calculatorId, numeric, inputs ?? {})
   const reviewKey = record.bands?.length ? `${calculatorId}:bands` : calculatorId
@@ -29,6 +31,7 @@ export function EvidencePanel({ calculatorId, result, inputs }: { calculatorId: 
   return (
     <div className="space-y-3 text-sm">
       {suggestionBlock}
+      {plain}
       <Separator />
       <h4 className="text-sm font-medium text-muted-foreground">About this result</h4>
       <p>{RESULT_KIND_TEXT[record.resultKind]}</p>

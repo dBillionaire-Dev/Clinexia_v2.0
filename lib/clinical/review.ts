@@ -15,6 +15,14 @@ export type ReviewState =
   | { status: "approved"; reviewer: string; credentials: string; reviewedAt: string; scope: string; notes?: string }
 
 export const CLINICAL_REVIEWS: Record<string, ReviewState> = {
+  "patient:bmi": { status: "pending" }, // clinexia-upgrade:phase8
+  "patient:egfr-ckd-epi": { status: "pending" },
+  "patient:hba1c-eag": { status: "pending" },
+  "patient:ldl-friedewald": { status: "pending" },
+  "patient:ldl-sampson": { status: "pending" },
+  "patient:cha2ds2-vasc": { status: "pending" },
+  "patient:has-bled": { status: "pending" },
+  "patient:mean-arterial-pressure": { status: "pending" },
   "cha2ds2-vasc:bands": { status: "pending" },
   "has-bled:bands": { status: "pending" },
   "emergency-doses": { status: "pending" }, // clinexia-upgrade:phase6
