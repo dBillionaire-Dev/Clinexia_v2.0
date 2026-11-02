@@ -96,6 +96,7 @@ export default function WelcomePage() {
               <Button asChild size="lg"><AppLink path="/">Open the web app<ArrowRight className="ml-2 h-4 w-4" aria-hidden /></AppLink></Button>
               <AndroidButton variant="secondary" />
               <InstallPwaButton variant="outline" />
+              <Button asChild size="lg" variant="ghost"><AppLink path="/about">About Clinexia<ArrowRight className="ml-2 h-4 w-4" aria-hidden /></AppLink></Button>
             </div>
             <ul className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
               <li className="flex items-center gap-2"><WifiOff className="h-4 w-4 text-primary" aria-hidden />Works offline</li>
@@ -237,6 +238,7 @@ export default function WelcomePage() {
             <AppLink path="/conversions" className="hover:text-foreground">Conversions</AppLink>
             <AppLink path="/lab-tools" className="hover:text-foreground">Lab tools</AppLink>
             <AppLink path="/estimators" className="hover:text-foreground">Estimators</AppLink>
+            <AppLink path="/about" className="hover:text-foreground">About</AppLink>
             <AppLink path="/privacy" className="hover:text-foreground">Privacy</AppLink>
           </nav>
         </div>

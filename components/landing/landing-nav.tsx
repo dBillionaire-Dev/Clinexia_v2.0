@@ -27,6 +27,9 @@ export function LandingNav() {
               {l.label}
             </a>
           ))}
+          <AppLink path="/about" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+            About
+          </AppLink>
         </nav>
         <div className="ml-auto flex items-center gap-2">
           <ThemeToggle />

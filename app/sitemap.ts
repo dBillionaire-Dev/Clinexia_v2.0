@@ -11,6 +11,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     entry("/"),
     entry("/welcome"),
+    entry("/about"),
     entry("/privacy"),
     entry("/terms"),
     entry("/calculators"),
