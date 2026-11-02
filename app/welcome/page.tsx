@@ -69,7 +69,7 @@ export default function WelcomePage() {
     "@type": "SoftwareApplication",
     name: "Clinexia",
     applicationCategory: "HealthApplication",
-    operatingSystem: "Web, Android",
+    operatingSystem: "Web, Android, Windows",
     description: DESCRIPTION,
     url: CANONICAL,
     ...(LANDING.playStoreUrl ? { downloadUrl: LANDING.playStoreUrl } : {}),
