@@ -2,7 +2,8 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { Activity, Search, Menu, X } from "lucide-react"
+import { Search, Menu, X } from "lucide-react"
+import { LogoMark } from "@/components/brand/logo-mark" // clinexia-upgrade:phase7 logo
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { AccountMenu } from "@/components/account/account-menu"
@@ -16,7 +17,7 @@ export function Header({ onOpenSearch }: { onOpenSearch?: () => void }) {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16 gap-4">
           <Link href="/welcome" className="flex items-center gap-2 shrink-0">
-            <Activity className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+            <LogoMark className="h-6 w-6 text-[#0059e9] dark:text-blue-400" />
             <span className="text-lg font-bold">Clinexia</span>
           </Link>
 
