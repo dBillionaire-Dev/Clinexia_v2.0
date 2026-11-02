@@ -15,6 +15,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
+// clinexia-upgrade:phase2 imports
+import { PatientContextPanel } from "@/components/clinical/patient-context-panel"
+import { EvidencePanel } from "@/components/clinical/evidence-panel"
+import { GuidedFlow } from "@/components/calculators/guided-flow"
+import { isGuidedEligible } from "@/lib/clinical/guided"
+import { summariseIssues, validateInputs } from "@/lib/clinical/input-validation"
 import { useToast } from "@/hooks/use-toast"
 import { isFavorite, toggleFavorite } from "@/lib/favorites"
 import { recordUsage } from "@/lib/recently-used"
@@ -58,6 +64,7 @@ function CalculatorRunnerInner({ calculatorId, embed }: { calculatorId: string; 
   const [error, setError] = useState<string | null>(null)
   const [savedToHistory, setSavedToHistory] = useState(false)
   const [calculating, setCalculating] = useState(false)
+  const [mode, setMode] = useState<"form" | "guided">("form") // clinexia-upgrade:phase2 mode
   const [favorite, setFavorite] = useState(() => (definition ? isFavorite(definition.id) : false))
   const { toast } = useToast()
   const { record } = useHistory()
@@ -174,6 +181,9 @@ function CalculatorRunnerInner({ calculatorId, embed }: { calculatorId: string; 
         parsed[input.id] = input.kind === "number" ? (raw === "" ? "" : raw) : raw
       }
 
+      // clinexia-upgrade:phase2 validation: every problem reported together; selects must be a listed option
+      const issues = validateInputs(definition, parsed)
+      if (issues.length) throw new Error(summariseIssues(issues))
       validateCalculatorInputBounds(definition, parsed)
       const calcResult = definition.calculate(parsed)
       const safetyWarnings = getDosingSafetyWarnings(definition, parsed, calcResult)
@@ -328,7 +338,40 @@ function CalculatorRunnerInner({ calculatorId, embed }: { calculatorId: string; 
         <CardContent className="space-y-5">
           <ClinicalUseNotice category={definition.category} />
           {smartLines.length > 0 ? <SmartPrefillNotice lines={smartLines} /> : null}
+          {/* clinexia-upgrade:phase2 guided + patient context */}
+          {!embed && mode === "form" && isGuidedEligible(definition) ? (
+            <div className="flex items-center justify-between gap-2 rounded-md border bg-muted/20 p-3 text-sm">
+              <span>Prefer one question at a time, with an Unknown option?</span>
+              <Button type="button" size="sm" variant="outline" onClick={() => setMode("guided")}>Guided mode</Button>
+            </div>
+          ) : null}
+          {!embed && mode === "guided" ? (
+            <GuidedFlow
+              definition={definition}
+              onCancel={() => setMode("form")}
+              onFinish={(vals, calc) => {
+                setMode("form")
+                setValues((prev) => ({ ...prev, ...vals }))
+                setResult(null)
+                if (calc) void handleCalculate(vals)
+              }}
+            />
+          ) : null}
+          {!embed && mode === "form" ? (
+            <PatientContextPanel
+              definition={definition}
+              values={values}
+              onApply={(next) => {
+                setValues((prev) => ({ ...prev, ...next }))
+                setResult(null)
+                setError(null)
+                setSavedToHistory(false)
+                lastParsedInputsRef.current = null
+              }}
+            />
+          ) : null}
           <form
+            hidden={mode === "guided"}
             className="space-y-5"
             onSubmit={(event) => {
               event.preventDefault()
@@ -509,6 +552,7 @@ function CalculatorRunnerInner({ calculatorId, embed }: { calculatorId: string; 
               </div>
             ) : null}
 
+            {!embed ? <EvidencePanel calculatorId={definition.id} result={result} inputs={lastParsedInputsRef.current} /> : null}
             {(definition.notes?.length || definition.limitations?.length) ? (
               <div>
                 <Separator className="mb-3" />
