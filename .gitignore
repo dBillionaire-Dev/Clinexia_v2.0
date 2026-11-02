@@ -43,3 +43,6 @@ next-env.d.ts
 
 # @clinexia/core build output
 packages/core/dist/
+
+# clinexia-upgrade
+.clinexia-upgrade-backup/
