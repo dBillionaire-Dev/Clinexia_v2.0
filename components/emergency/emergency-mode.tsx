@@ -8,6 +8,7 @@ import { AGE_GROUP_LABEL, buildDashboard, type AgeGroup, type DoseLine, type Ton
 import { DOSE_DATA_VERSION, EMERGENCY_SOURCES, WEIGHT_LIMITS } from "@/lib/emergency/dose-data"
 import { parseStrictNumber } from "@/lib/clinical/input-validation"
 import { isReleased, previewEnabled } from "@/lib/clinical/review"
+import { WeightEstimator, type EstimateChoice } from "@/components/emergency/weight-estimator" // clinexia-upgrade:phase9 estimate
 
 const TONE: Record<Tone, string> = {
   red: "border-red-500 bg-red-950/60",
@@ -34,6 +35,7 @@ export function EmergencyMode({ onExit }: { onExit: () => void }) {
   const released = isReleased("emergency-doses")
   const [group, setGroup] = useState<AgeGroup | null>(null)
   const [text, setText] = useState("")
+  const [estimate, setEstimate] = useState<EstimateChoice | null>(null) // clinexia-upgrade:phase9 state
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onExit() }
@@ -93,10 +95,12 @@ export function EmergencyMode({ onExit }: { onExit: () => void }) {
               </section>
             ) : <p className="text-lg text-zinc-300">Choose an age group to begin.</p>}
 
+            {group === "pediatric" && isReleased("emergency-weight-estimation") ? <WeightEstimator onUse={(c) => { setText(String(c.kg)); setEstimate(c) }} /> : null}
             {dashboard && !dashboard.ok ? <p role="alert" className="rounded-lg border-2 border-amber-400 p-4 text-lg font-bold text-amber-200">{dashboard.error}</p> : null}
 
             {dashboard?.ok ? (
               <div className="space-y-6" aria-live="polite">
+                {estimate && weight === estimate.kg ? <p role="alert" className="rounded-lg border-2 border-amber-400 bg-amber-950/60 p-3 text-base font-bold text-amber-100">ESTIMATED WEIGHT: {estimate.kg} kg ({estimate.label}). The real weight may be very different. Replace it with a measured or length-based weight as soon as you can.</p> : null}
                 {group !== "adult" || weight !== null ? <p className="text-xl font-black">{AGE_GROUP_LABEL[group!]}{weight !== null ? `, ${weight} kg` : ""}</p> : <p className="text-xl font-black">Adult (fixed doses)</p>}
                 {sections.map((s) => (
                   <section key={s} aria-label={s} className="space-y-3">

@@ -15,6 +15,7 @@ export type ReviewState =
   | { status: "approved"; reviewer: string; credentials: string; reviewedAt: string; scope: string; notes?: string }
 
 export const CLINICAL_REVIEWS: Record<string, ReviewState> = {
+  "emergency-weight-estimation": { status: "pending" }, // clinexia-upgrade:phase9
   "patient:bmi": { status: "pending" }, // clinexia-upgrade:phase8
   "patient:egfr-ckd-epi": { status: "pending" },
   "patient:hba1c-eag": { status: "pending" },
