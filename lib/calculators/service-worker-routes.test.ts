@@ -16,6 +16,6 @@ describe("service worker route coverage", () => {
   })
 
   it("uses the current cache generation", () => {
-    expect(serviceWorkerText()).toContain('const CACHE_VERSION = "v5"')
+    expect(serviceWorkerText()).toContain('const CACHE_VERSION = "v6"')
   })
 })

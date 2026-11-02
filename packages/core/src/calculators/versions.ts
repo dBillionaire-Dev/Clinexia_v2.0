@@ -26,6 +26,7 @@ export const FORMULA_VERSIONS: Record<string, string> = {
   "fena": "1.0.0",
   "feurea": "1.0.0",
   "ldl-friedewald": "1.0.0",
+  "ldl-sampson": "1.0.0",
   "non-hdl-cholesterol": "1.0.0",
   "vldl-estimate": "1.0.0",
   "anion-gap": "1.0.0",
